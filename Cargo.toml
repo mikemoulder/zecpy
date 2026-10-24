@@ -17,12 +17,15 @@ pyo3 = { version = "=0.30.1", features = ["abi3-py310"] }
 pyo3-async-runtimes = { version = "=0.30.0", features = ["tokio-runtime"] }
 
 # Zcash. Exact pins: the crates.io releases of 2026-10-21.
-# `transparent-inputs` is deliberately absent from every crate: the code that would query
-# the server about transparent addresses is not compiled into ZecPy at all.
-zcash_client_backend = { version = "=0.25.0", features = ["lightwalletd-tonic-tls-webpki-roots", "orchard", "sync", "tor"] }
-zcash_client_sqlite = { version = "=0.23.0", features = ["orchard"] }
+# `pczt` (cold signing) forces `transparent-inputs` on zcash_client_backend, and
+# zcash_client_sqlite must match. ZecPy still never queries the server about transparent
+# addresses: that call lived in librustzcash's sync::run, which src/sync.rs replaces, and
+# tests/test_devnet_leak_audit.py asserts on every run that no such request is made.
+zcash_client_backend = { version = "=0.25.0", features = ["lightwalletd-tonic-tls-webpki-roots", "orchard", "pczt", "sync", "tor"] }
+zcash_client_sqlite = { version = "=0.23.0", features = ["orchard", "serde", "transparent-inputs"] }
 zcash_keys = { version = "=0.17.0", features = ["orchard", "sapling"] }
 orchard = { version = "=0.16.0", default-features = false }
+pczt = { version = "=0.10.0", features = ["prover", "signer", "tx-extractor"] }
 sapling = { package = "sapling-crypto", version = "=0.9.0" }
 zcash_address = "=0.14.0"
 zcash_primitives = "=0.31.0"

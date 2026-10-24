@@ -3129,6 +3129,7 @@ checksum = "c6b48fdfdc5c6b58a00514f9b2504fae98f7cde9f741f3477264b411cd69134d"
 dependencies = [
  "blake2b_simd",
  "bls12_381",
+ "document-features",
  "ff 0.14.0",
  "getset",
  "jubjub",
@@ -6291,6 +6292,7 @@ checksum = "4a0e2d11620c50695fe12bbbfde96b3477fe606e7284c22d505c12ce51214514"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
+ "serde_core",
  "wasm-bindgen",
 ]
 
@@ -6921,6 +6923,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "bech32",
+ "bip32",
  "bls12_381",
  "bs58",
  "byteorder",
@@ -6940,13 +6943,16 @@ dependencies = [
  "nonempty",
  "orchard",
  "pasta_curves",
+ "pczt",
  "percent-encoding",
+ "postcard",
  "prost",
  "rand 0.10.3",
  "rand_core 0.10.1",
  "rayon",
  "rust_decimal",
  "sapling-crypto",
+ "secp256k1",
  "secrecy",
  "serde",
  "serde_json",
@@ -6982,6 +6988,7 @@ version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1d85c3c832c8554da6ed6114c81afef84f7dbb84c2279a3889277a8d2225019"
 dependencies = [
+ "bip32",
  "bitflags 2.13.2",
  "bs58",
  "byteorder",
@@ -7003,7 +7010,9 @@ dependencies = [
  "sapling-crypto",
  "schemerz",
  "schemerz-rusqlite",
+ "secp256k1",
  "secrecy",
+ "serde",
  "shardtree",
  "static_assertions",
  "subtle",
@@ -7040,6 +7049,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e35ad8dafd173b0465e5963b520b241f497d978319faed46547bd81f403fa98"
 dependencies = [
  "bech32",
+ "bip32",
  "blake2b_simd",
  "bls12_381",
  "bs58",
@@ -7116,6 +7126,7 @@ dependencies = [
  "rand_core 0.10.1",
  "redjubjub",
  "sapling-crypto",
+ "secp256k1",
  "sha2 0.10.9",
  "zcash_encoding",
  "zcash_note_encryption",
@@ -7219,6 +7230,7 @@ dependencies = [
  "bip0039",
  "futures-util",
  "orchard",
+ "pczt",
  "prost",
  "pyo3",
  "pyo3-async-runtimes",

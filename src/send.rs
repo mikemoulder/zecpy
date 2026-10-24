@@ -2,7 +2,7 @@
 
 use std::num::NonZeroUsize;
 use std::str::FromStr;
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -10,8 +10,17 @@ use rand::{rand_core::UnwrapErr, rngs::SysRng};
 use zcash_address::ZcashAddress;
 use zcash_client_backend::data_api::wallet::input_selection::{GreedyInputSelector, GreedyInputSelectorError, SpendPolicy};
 use zcash_client_backend::data_api::wallet::{
-    ConfirmationsPolicy, SpendingKeys, create_proposed_transactions, propose_transfer,
+    ConfirmationsPolicy, SpendingKeys, create_pczt_from_proposal, create_proposed_transactions,
+    extract_and_store_transaction_from_pczt, propose_transfer,
 };
+use zcash_client_backend::proposal::Proposal;
+use pczt::Pczt;
+use pczt::roles::prover::Prover;
+use zcash_primitives::transaction::TxId;
+use zcash_primitives::transaction::builder::BundlePadding;
+use zcash_primitives::transaction::components::orchard::bundle_version_for_branch;
+use zcash_protocol::consensus::BranchId;
+use zcash_client_sqlite::{AccountUuid, ReceivedNoteId};
 use zcash_client_backend::data_api::WalletRead;
 use zcash_client_backend::fees::zip317::MultiOutputChangeStrategy;
 use zcash_primitives::transaction::fees::zip317::FeeError;
@@ -94,14 +103,11 @@ impl SendRequest {
     }
 }
 
-/// Builds, proves and signs the transaction, storing it in the wallet. Returns the raw
-/// transaction ready to broadcast. CPU-bound: call from a blocking context.
-pub fn build(
-    db: &mut Db,
-    network: &Network,
-    usk: &UnifiedSpendingKey,
-    send: SendRequest,
-) -> PyResult<(String, RawTransaction)> {
+type WalletProposal = Proposal<StandardFeeRule, ReceivedNoteId>;
+
+/// Selects notes and computes change for a payment. Shared by direct sends and cold-signed
+/// ones, so both follow the same note-splitting and confirmation rules.
+fn propose(db: &mut Db, network: &Network, send: SendRequest) -> PyResult<(AccountUuid, WalletProposal)> {
     let account = crate::wallet::first_account(db)?;
     let change_strategy = MultiOutputChangeStrategy::new(
         StandardFeeRule::Zip317,
@@ -126,7 +132,34 @@ pub fn build(
         None,
     )
     .map_err(|e| WalletError::new_err(format!("cannot fund this payment: {e}")))?;
+    if proposal.steps().len() > 1 {
+        return Err(WalletError::new_err(
+            "this payment needs more than one transaction, which ZecPy does not send yet",
+        ));
+    }
+    Ok((account, proposal))
+}
 
+fn raw_transaction(db: &Db, txid: TxId) -> PyResult<(String, RawTransaction)> {
+    let tx = db
+        .get_transaction(txid)
+        .map_err(error::wallet("cannot load the new transaction"))?
+        .ok_or_else(|| WalletError::new_err("new transaction missing from wallet"))?;
+    let mut raw = RawTransaction::default();
+    tx.write(&mut raw.data)
+        .map_err(error::wallet("cannot serialise transaction"))?;
+    Ok((tx.txid().to_string(), raw))
+}
+
+/// Builds, proves and signs the transaction, storing it in the wallet. Returns the raw
+/// transaction ready to broadcast. CPU-bound: call from a blocking context.
+pub fn build(
+    db: &mut Db,
+    network: &Network,
+    usk: &UnifiedSpendingKey,
+    send: SendRequest,
+) -> PyResult<(String, RawTransaction)> {
+    let (_, proposal) = propose(db, network, send)?;
     let txids = create_proposed_transactions::<_, _, GreedyInputSelectorError, _, FeeError, _>(
         db,
         network,
@@ -140,20 +173,87 @@ pub fn build(
         None,
     )
     .map_err(|e| WalletError::new_err(format!("cannot build transaction: {e}")))?;
-    if txids.len() > 1 {
+    raw_transaction(db, *txids.first())
+}
+
+/// Builds an unsigned, proven PCZT for a cold signer. Needs no spending key: Orchard and
+/// Ironwood proofs only use public data. Sapling spends would need a proof key derived from
+/// the seed, so they are refused. CPU-bound: call from a blocking context.
+pub fn build_pczt(db: &mut Db, network: &Network, send: SendRequest) -> PyResult<Vec<u8>> {
+    let (account, proposal) = propose(db, network, send)?;
+    let pczt = create_pczt_from_proposal::<_, _, GreedyInputSelectorError, _, FeeError, _>(
+        db,
+        network,
+        &SystemClock,
+        &mut UnwrapErr(SysRng),
+        account,
+        OvkPolicy::Sender,
+        &proposal,
+        None,
+        BundlePadding::DEFAULT,
+    )
+    .map_err(|e| WalletError::new_err(format!("cannot build unsigned transaction: {e}")))?;
+
+    let branch_id = BranchId::try_from(*pczt.global().consensus_branch_id())
+        .map_err(|_| WalletError::new_err("PCZT has an unknown consensus branch"))?;
+    let mut prover_role = Prover::new(pczt);
+    if prover_role.requires_sapling_proofs() {
         return Err(WalletError::new_err(
-            "this payment needs more than one transaction, which ZecPy does not send yet",
+            "this payment would spend Sapling notes, which a cold signer must prove itself; \
+             ZecPy cold signing spends Orchard and Ironwood notes only",
         ));
     }
+    if prover_role.requires_orchard_proof() || prover_role.requires_ironwood_proof() {
+        let pk = orchard_proving_key(branch_id)?;
+        if prover_role.requires_orchard_proof() {
+            prover_role = prover_role
+                .create_orchard_proof(UnwrapErr(SysRng), &pk)
+                .map_err(|e| WalletError::new_err(format!("Orchard proof failed: {e:?}")))?;
+        }
+        if prover_role.requires_ironwood_proof() {
+            prover_role = prover_role
+                .create_ironwood_proof(UnwrapErr(SysRng), &pk)
+                .map_err(|e| WalletError::new_err(format!("Ironwood proof failed: {e:?}")))?;
+        }
+    }
+    prover_role
+        .finish()
+        .serialize()
+        .map_err(|e| WalletError::new_err(format!("cannot serialise PCZT: {e:?}")))
+}
 
-    let tx = db
-        .get_transaction(*txids.first())
-        .map_err(error::wallet("cannot load the new transaction"))?
-        .ok_or_else(|| WalletError::new_err("new transaction missing from wallet"))?;
-    let mut raw = RawTransaction::default();
-    tx.write(&mut raw.data)
-        .map_err(error::wallet("cannot serialise transaction"))?;
-    Ok((tx.txid().to_string(), raw))
+/// The Orchard proving key for the circuit a branch uses (Orchard and Ironwood share it).
+/// Building one takes seconds, so each circuit version is built once per process.
+fn orchard_proving_key(branch_id: BranchId) -> PyResult<Arc<orchard::circuit::ProvingKey>> {
+    static KEYS: OnceLock<Mutex<Vec<(BranchId, Arc<orchard::circuit::ProvingKey>)>>> = OnceLock::new();
+    let version = bundle_version_for_branch(branch_id, orchard::ValuePool::Orchard)
+        .ok_or_else(|| WalletError::new_err(format!("branch {branch_id:?} has no Orchard")))?
+        .circuit_version();
+    let mut keys = KEYS.get_or_init(Default::default).lock().unwrap();
+    if let Some((_, pk)) = keys.iter().find(|(b, _)| *b == branch_id) {
+        return Ok(Arc::clone(pk));
+    }
+    let pk = Arc::new(orchard::circuit::ProvingKey::build(version));
+    keys.push((branch_id, Arc::clone(&pk)));
+    Ok(pk)
+}
+
+/// Checks a signed PCZT, extracts the transaction and stores it in the wallet. Returns it
+/// ready to broadcast.
+pub fn extract_signed(db: &mut Db, signed: &[u8]) -> PyResult<(String, RawTransaction)> {
+    let pczt = Pczt::parse(signed)
+        .map_err(|e| PyValueError::new_err(format!("not a valid PCZT: {e:?}")))?;
+    let (spend_vk, output_vk) = prover().verifying_keys();
+    let txid = extract_and_store_transaction_from_pczt::<_, ReceivedNoteId>(
+        db,
+        &SystemClock,
+        &mut UnwrapErr(SysRng),
+        pczt,
+        Some((&spend_vk, &output_vk)),
+        None,
+    )
+    .map_err(|e| WalletError::new_err(format!("signed PCZT is incomplete or invalid: {e:?}")))?;
+    raw_transaction(db, txid)
 }
 
 /// A uniformly random delay in `[0, max_seconds)`, from the system CSPRNG.

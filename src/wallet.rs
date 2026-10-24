@@ -9,12 +9,14 @@ use rand::{rand_core::UnwrapErr, rngs::SysRng};
 use secrecy::SecretVec;
 use tokio::sync::Mutex;
 use zcash_client_backend::data_api::wallet::ConfirmationsPolicy;
-use zcash_client_backend::data_api::{Account, AccountBirthday, WalletRead, WalletWrite};
+use zcash_client_backend::data_api::{
+    Account, AccountBirthday, AccountPurpose, WalletRead, WalletWrite, Zip32Derivation,
+};
 use zcash_client_backend::proto::service::{BlockId, ChainSpec};
 use zcash_client_sqlite::util::SystemClock;
 use zcash_client_sqlite::wallet::init::init_wallet_db;
 use zcash_client_sqlite::{AccountUuid, WalletDb};
-use zcash_keys::keys::{UnifiedAddressRequest, UnifiedSpendingKey};
+use zcash_keys::keys::{UnifiedAddressRequest, UnifiedFullViewingKey, UnifiedSpendingKey};
 use zcash_protocol::consensus::{BlockHeight, NetworkUpgrade, Parameters};
 use zeroize::Zeroize;
 use zip32::DiversifierIndex;
@@ -229,6 +231,74 @@ impl NativeWallet {
         })
     }
 
+    /// Creates a watch-only wallet from a cold signer's watch bundle (viewing key, seed
+    /// fingerprint, account index). It syncs, issues invoices and builds unsigned
+    /// transactions, but holds no spending key.
+    #[staticmethod]
+    #[pyo3(signature = (path, network, heights, server, tor, ufvk, seed_fingerprint, account, birthday=None))]
+    #[allow(clippy::too_many_arguments)]
+    fn watch<'py>(
+        py: Python<'py>,
+        path: String,
+        network: &str,
+        heights: Option<HashMap<String, u32>>,
+        server: &str,
+        tor: bool,
+        ufvk: &str,
+        seed_fingerprint: &str,
+        account: u32,
+        birthday: Option<u32>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let network = Network::from_spec(network, heights.as_ref())?;
+        let server = Server::new(server, tor, tor_dir_for(&path))?;
+        let ufvk = UnifiedFullViewingKey::decode(&network, ufvk)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("invalid viewing key: {e}")))?;
+        let fingerprint: [u8; 32] = (0..seed_fingerprint.len())
+            .step_by(2)
+            .map(|i| seed_fingerprint.get(i..i + 2).and_then(|h| u8::from_str_radix(h, 16).ok()))
+            .collect::<Option<Vec<u8>>>()
+            .and_then(|v| v.try_into().ok())
+            .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("seed fingerprint must be 64 hex characters"))?;
+        let account = zip32::AccountId::try_from(account)
+            .map_err(|_| pyo3::exceptions::PyValueError::new_err("account index out of range"))?;
+        let derivation = Zip32Derivation::new(zip32::fingerprint::SeedFingerprint::from_bytes(fingerprint), account);
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let db_path = path.clone();
+            let mut client = server.connect(Purpose::Sync).await?;
+            let tip = chain_tip(&mut client).await?;
+            // Without a birthday, scan from the earliest height: a viewing key may have history.
+            let height = coarsen_birthday(&network, birthday.unwrap_or(0), tip);
+            let account_birthday = fetch_birthday(&mut client, height).await?;
+            let db = tokio::task::spawn_blocking(move || -> PyResult<Db> {
+                let mut db = open_db(&path, network)?;
+                db.import_account_ufvk(
+                    "watch",
+                    &ufvk,
+                    &account_birthday,
+                    AccountPurpose::Spending { derivation: Some(derivation) },
+                    None,
+                )
+                .map_err(error::wallet("cannot import viewing key"))?;
+                db.update_chain_tip(BlockHeight::from_u32(tip))
+                    .map_err(error::wallet("cannot record chain tip"))?;
+                Ok(db)
+            })
+            .await
+            .map_err(error::wallet("wallet task failed"))??;
+            Ok(NativeWallet {
+                inner: Arc::new(Inner {
+                    db: Mutex::new(db),
+                    network,
+                    server,
+                    cache: MemoryBlockCache::default(),
+                    usk: None,
+                    path: db_path,
+                }),
+            })
+        })
+    }
+
     /// Opens an existing wallet database. With the mnemonic the wallet can send; without it
     /// the wallet is watch-only.
     #[staticmethod]
@@ -323,6 +393,53 @@ impl NativeWallet {
     fn received(&self, py: Python<'_>, since: u32) -> PyResult<Vec<received::ReceivedOutput>> {
         let path = self.inner.path.clone();
         py.detach(move || received::list(&path, since))
+    }
+
+    /// Builds and proves an unsigned transaction (PCZT) for a cold signer. Needs no
+    /// spending key, so it works on a watch-only wallet.
+    #[pyo3(signature = (to, amount_zat, memo=None, allow_transparent=false))]
+    fn propose_cold(
+        &self,
+        py: Python<'_>,
+        to: &str,
+        amount_zat: u64,
+        memo: Option<String>,
+        allow_transparent: bool,
+    ) -> PyResult<Vec<u8>> {
+        let inner = Arc::clone(&self.inner);
+        let request = SendRequest::new(&inner.network, to, amount_zat, memo.as_deref(), allow_transparent)?;
+        py.detach(move || {
+            let mut db = inner.db.blocking_lock();
+            send::build_pczt(&mut db, &inner.network, request)
+        })
+    }
+
+    /// Extracts the transaction from a PCZT the cold signer signed, records it and
+    /// broadcasts it on a circuit of its own. Returns the txid.
+    #[pyo3(signature = (signed, max_broadcast_delay=0.0))]
+    fn broadcast_signed<'py>(
+        &self,
+        py: Python<'py>,
+        signed: Vec<u8>,
+        max_broadcast_delay: f64,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        if !(0.0..=3600.0).contains(&max_broadcast_delay) {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "max_broadcast_delay must be between 0 and 3600 seconds",
+            ));
+        }
+        let inner = Arc::clone(&self.inner);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let mut client = inner.server.connect(Purpose::Broadcast).await?;
+            let mut db = inner.db.lock().await;
+            let (txid, raw) = tokio::task::block_in_place(|| send::extract_signed(&mut db, &signed))?;
+            drop(db);
+            if max_broadcast_delay > 0.0 {
+                tokio::time::sleep(send::random_delay(max_broadcast_delay)).await;
+            }
+            send::broadcast(&mut client, raw).await?;
+            Ok(txid)
+        })
     }
 
     #[getter]

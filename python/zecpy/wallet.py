@@ -11,10 +11,13 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import TYPE_CHECKING, Mapping
 
 from ._native import Balance, NativeWallet
 from .invoices import Invoices
+
+if TYPE_CHECKING:
+    from .cold import WatchBundle
 
 _DB = "wallet.db"
 _CONFIG = "zecpy.json"
@@ -114,6 +117,35 @@ class Wallet:
         return cls(native, wallet_dir)
 
     @classmethod
+    async def watch(
+        cls,
+        path: str | os.PathLike[str],
+        bundle: "WatchBundle | str",
+        *,
+        server: str,
+        birthday: int | None = None,
+        tor: bool = True,
+        regtest_heights: Mapping[str, int] | None = None,
+    ) -> Wallet:
+        """Creates a watch-only wallet from a cold signer's watch bundle.
+
+        It syncs, reports balances, issues invoices and builds unsigned transactions with
+        ``propose_cold``, but cannot spend: the key that can lives on the cold signer.
+        """
+        from .cold import WatchBundle
+
+        if isinstance(bundle, str):
+            bundle = WatchBundle.from_json(bundle)
+        wallet_dir = _prepare_new(path)
+        heights = dict(regtest_heights) if regtest_heights is not None else None
+        native = await NativeWallet.watch(
+            str(wallet_dir / _DB), bundle.network, heights, server, tor,
+            bundle.ufvk, bundle.seed_fingerprint, bundle.account, birthday,
+        )
+        _Config(bundle.network, heights).save(wallet_dir)
+        return cls(native, wallet_dir)
+
+    @classmethod
     def open(
         cls,
         path: str | os.PathLike[str],
@@ -177,6 +209,25 @@ class Wallet:
         moment of the action that caused it (a checkout, a payroll run).
         """
         return await self._native.send(to, amount_zat, memo, allow_transparent, max_broadcast_delay)
+
+    def propose_cold(
+        self,
+        to: str,
+        amount_zat: int,
+        memo: str | None = None,
+        *,
+        allow_transparent: bool = False,
+    ) -> bytes:
+        """Builds and proves an unsigned transaction (a PCZT) for a cold signer.
+
+        Works on watch-only wallets: Orchard and Ironwood proofs need no secret. The same
+        privacy rules as ``send`` apply.
+        """
+        return bytes(self._native.propose_cold(to, amount_zat, memo, allow_transparent))
+
+    async def broadcast_signed(self, signed_pczt: bytes, *, max_broadcast_delay: float = 0.0) -> str:
+        """Publishes a transaction the cold signer signed, on a Tor circuit of its own."""
+        return await self._native.broadcast_signed(signed_pczt, max_broadcast_delay)
 
     def __repr__(self) -> str:
         return f"Wallet(path={str(self.path)!r}, network={self.network!r})"
