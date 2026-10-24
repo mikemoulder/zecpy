@@ -71,7 +71,7 @@ Every box is a folder in this repo or a running process.
 
 | Guarantee | How it is enforced |
 |---|---|
-| No transparent address queries | The `transparent-inputs` features of `zcash_client_backend` and `zcash_client_sqlite` are not compiled in, so the wallet code that would issue `GetAddressUtxos` or `GetTaddressTxids` does not exist in the binary. (The low-level `zcash_transparent` crate still gets its own `transparent-inputs` feature from `pczt`, a transaction-format dependency of `zcash_client_sqlite`; it makes no network requests.) Check with `cargo tree -e features -i zcash_client_backend` |
+| No transparent address queries | ZecPy's own sync loop (`src/sync.rs`) never issues `GetAddressUtxos` or `GetTaddressTxids`; the call that did lived in librustzcash's `sync::run`, which ZecPy does not use. `tests/test_devnet_leak_audit.py` asserts on every run that no such request is made. (Cold signing needs the `pczt` feature, which compiles librustzcash's transparent wallet code in; ZecPy never calls it.) |
 | No transaction lookups in the clear | Memo and transaction-detail fetches only run over Tor; otherwise they are skipped and reported as unavailable |
 | Server cannot pin the wallet's birthday | Birthday rounded down to a 10,000-block boundary before `GetTreeState` |
 | IP not linked to the wallet | Tor is the default for any non-loopback server. If Tor fails, ZecPy raises; it never falls back to a direct connection silently |

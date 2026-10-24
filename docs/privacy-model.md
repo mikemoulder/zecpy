@@ -51,13 +51,26 @@ one.
 
 | Leak | In a typical light wallet | In ZecPy |
 |---|---|---|
-| Transparent address queries (`GetAddressUtxos`, `GetTaddressTxids`) on every sync | Sent, unless the wallet is built without transparent support | The wallet-level `transparent-inputs` features are not compiled in (see `cargo tree -e features -i zcash_client_backend`) |
+| Transparent address queries (`GetAddressUtxos`, `GetTaddressTxids`) on every sync | Sent by librustzcash's `sync::run` when transparent support is built in | Never sent: ZecPy's own sync loop has no transparent queries, and the leak audit asserts their absence on every test run |
 | Exact birthday (`GetTreeState` at birthday - 1) | Sent at wallet creation | Birthday rounded down to a 10,000-block boundary |
 | Where the last sync stopped (`GetTreeState` at every batch start) | Sent on every incremental sync by librustzcash `sync::run`; links sessions | Own sync loop: the tip's tree state comes from `GetLatestTreeState` and is saved for the next sync; adjacent ranges merge; batches split only at multiples of 1,000 |
 | Memo and transaction-detail fetches (`GetTransaction` by txid) | Sent to read memos and fill in history | Never sent. Invoices match payments by receiving address, so memos are not needed |
 | Payments to transparent addresses | Allowed | Refused with `PrivacyError` unless `allow_transparent=True` |
 | Network path linking sync and send | One connection, or one Tor circuit, for everything | Every sync session and every broadcast gets its own isolated Tor circuit; a failed circuit is retried on a fresh one, never directly |
 | Broadcast timing | Published the moment it is built | Optional `max_broadcast_delay`: published after a random delay from the system CSPRNG |
+
+## Cold signing
+
+A hot server can run with only a viewing key: `Wallet.watch` imports the account from a
+`ColdSigner`'s watch bundle, `propose_cold` builds and proves an unsigned transaction (PCZT),
+and the offline signer signs it. The hot server never holds a key that can spend.
+
+The signer decides which outputs are change by checking each recipient against its own
+viewing key, not by trusting the address labels the hot side attached. A compromised hot
+server cannot disguise a payment to itself as change.
+
+The watch bundle contains the Unified Full Viewing Key, which reveals the account's full
+history to whoever holds it. It cannot spend, but it is confidential.
 
 ## What the server still learns
 
