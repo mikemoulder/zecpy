@@ -1,0 +1,59 @@
+# Rust build output
+target/
+**/*.rs.bk
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+wheels/
+*.so
+*.pyd
+.ipynb_checkpoints/
+
+# Wallet state. Never commit a wallet database or anything derived from a seed.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+wallets/
+*.seed
+*.mnemonic
+*.ufvk
+*.usk
+
+# Proving parameters (downloaded and cached at runtime)
+*.params
+params/
+
+# Leak-audit recordings may contain real txids and IPs. Commit only scrubbed fixtures.
+audit-logs/
+
+# Environment. NEVER commit these. Commit .env.example instead.
+.env
+.env.local
+.env*.local
+
+# Logs
+*.log
+
+# Editor and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Deliberately NOT ignored:
+#   *.md          docs/ is judge-facing evidence (architecture, privacy model,
+#                 integrations). Ignoring markdown hides it.
+#   handoff.md    shared continuity.
+#   memory.md     shared project knowledge.

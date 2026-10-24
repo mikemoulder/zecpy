@@ -1,0 +1,33 @@
+# Per-event config read by the skillz skills. Values here override each skill's CONFIG.md defaults.
+hackathon:
+  name:     ZECATHON
+  theme:    "Thirty days to build something on Zcash that does not leak."
+  url:      https://thezecathon.com/
+  tracks:   [Shielded Payments, Private Markets, Cross-Chain, Core & Tooling, Wildcard]
+  format:   online
+  deadline: 2026-10-28   # exact cutoff time behind sign-in, confirm it
+
+target_tracks: [Core & Tooling]   # one submission, one track
+
+team:
+  size: 1
+
+rubric:            # official criteria, equal weight assumed until confirmed
+  privacy:     25  # leaks are disqualifying, not deductions
+  usefulness:  25
+  execution:   25
+  originality: 25
+
+requires:
+  deployed_url: false   # deliverable is a library, wheel, examples, docs
+  video:        true
+  open_source:  true
+
+repo:
+  layout: flat
+
+commits:
+  format:         conventional
+  em_dashes:      forbidden
+  ai_attribution: forbidden
+  identity:       "xerodahdev <xero.dev.ai@gmail.com>"
