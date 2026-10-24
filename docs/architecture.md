@@ -139,9 +139,12 @@ class Wallet:
 In cut order, decided now:
 
 ```text
-1. Payroll example (payment bot stays)
+1. Payroll / batch payouts (payment bot stays)
 2. Mempool (0-conf) payment detection
-3. Memo reading over Tor (send-side memos stay)
-4. Watch-only wallets from a UFVK
-5. Prebuilt macOS / Windows wheels
+3. Memo reading (needs GetTransaction by txid, which names the transaction)
+4. Prebuilt macOS / Windows wheels
 ```
+
+In scope since Sat night: Tor with isolated circuits, PCZT cold signing with a watch-only
+hot wallet, the leak audit as a standalone tool with a cross-wallet report, and the
+upstream librustzcash fix.
