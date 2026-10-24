@@ -163,15 +163,20 @@ class Wallet:
         memo: str | None = None,
         *,
         allow_transparent: bool = False,
+        max_broadcast_delay: float = 0.0,
     ) -> str:
         """Pays ``amount_zat`` zatoshis to ``to`` and returns the txid.
 
         Spends shielded funds only. A transparent-only recipient raises ``PrivacyError``
         unless ``allow_transparent`` is set, because the payment would be public on chain.
         The transaction is proved and signed locally; only the finished transaction is sent
-        to the server.
+        to the server, over a Tor circuit used for nothing else.
+
+        ``max_broadcast_delay`` holds the finished transaction for a random time up to that
+        many seconds before publishing it, so it does not appear on the network at the
+        moment of the action that caused it (a checkout, a payroll run).
         """
-        return await self._native.send(to, amount_zat, memo, allow_transparent)
+        return await self._native.send(to, amount_zat, memo, allow_transparent, max_broadcast_delay)
 
     def __repr__(self) -> str:
         return f"Wallet(path={str(self.path)!r}, network={self.network!r})"

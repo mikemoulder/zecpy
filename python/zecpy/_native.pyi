@@ -44,7 +44,12 @@ class NativeWallet:
         phrase: str | None = None,
     ) -> NativeWallet: ...
     def send(
-        self, to: str, amount_zat: int, memo: str | None = None, allow_transparent: bool = False
+        self,
+        to: str,
+        amount_zat: int,
+        memo: str | None = None,
+        allow_transparent: bool = False,
+        max_broadcast_delay: float = 0.0,
     ) -> Awaitable[str]: ...
     @property
     def can_send(self) -> bool: ...

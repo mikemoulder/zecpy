@@ -21,7 +21,7 @@ use zip32::DiversifierIndex;
 
 use crate::cache::MemoryBlockCache;
 use crate::error::{self, PrivacyError, WalletError};
-use crate::net::{Client, Server};
+use crate::net::{Client, Purpose, Server};
 use crate::network::Network;
 use crate::received;
 use crate::send::{self, SendRequest};
@@ -63,6 +63,11 @@ pub struct Balance {
     pub ironwood: u64,
     pub chain_tip: u32,
     pub scanned_height: u32,
+}
+
+/// Tor keeps its state next to the wallet database, inside the wallet directory.
+fn tor_dir_for(db_path: &str) -> std::path::PathBuf {
+    std::path::Path::new(db_path).with_file_name("tor")
 }
 
 fn open_db(path: &str, network: Network) -> PyResult<Db> {
@@ -164,7 +169,7 @@ impl NativeWallet {
         birthday: Option<u32>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let network = Network::from_spec(network, heights.as_ref())?;
-        let server = Server::new(server, tor)?;
+        let server = Server::new(server, tor, tor_dir_for(&path))?;
         let restoring = phrase.is_some();
         let mnemonic = match phrase {
             Some(mut p) => {
@@ -178,7 +183,7 @@ impl NativeWallet {
 
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             let db_path = path.clone();
-            let mut client = server.connect().await?;
+            let mut client = server.connect(Purpose::Sync).await?;
             let tip = chain_tip(&mut client).await?;
             // A new wallet cannot have received anything before now; a restored one needs
             // the caller's birthday, or scans from the earliest possible height.
@@ -237,7 +242,7 @@ impl NativeWallet {
         phrase: Option<String>,
     ) -> PyResult<Self> {
         let network = Network::from_spec(network, heights.as_ref())?;
-        let server = Server::new(server, tor)?;
+        let server = Server::new(server, tor, tor_dir_for(path))?;
         let db = open_db(path, network)?;
         let usk = phrase.map(|p| spending_key_for(&db, &network, p)).transpose()?;
         Ok(NativeWallet {
@@ -253,7 +258,11 @@ impl NativeWallet {
     }
 
     /// Sends a shielded payment and returns its txid. Proving runs off the event loop.
-    #[pyo3(signature = (to, amount_zat, memo=None, allow_transparent=false))]
+    ///
+    /// With `max_broadcast_delay`, the finished transaction waits a uniformly random time up
+    /// to that many seconds before it is published, so its appearance on the network is not
+    /// timed to the action that caused it.
+    #[pyo3(signature = (to, amount_zat, memo=None, allow_transparent=false, max_broadcast_delay=0.0))]
     fn send<'py>(
         &self,
         py: Python<'py>,
@@ -261,7 +270,13 @@ impl NativeWallet {
         amount_zat: u64,
         memo: Option<String>,
         allow_transparent: bool,
+        max_broadcast_delay: f64,
     ) -> PyResult<Bound<'py, PyAny>> {
+        if !(0.0..=3600.0).contains(&max_broadcast_delay) {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "max_broadcast_delay must be between 0 and 3600 seconds",
+            ));
+        }
         let inner = Arc::clone(&self.inner);
         if inner.usk.is_none() {
             return Err(WalletError::new_err(
@@ -270,13 +285,17 @@ impl NativeWallet {
         }
         let request = SendRequest::new(&inner.network, to, amount_zat, memo.as_deref(), allow_transparent)?;
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            // Connect first: if the server (or Tor) is unreachable, nothing is built or stored.
-            let mut client = inner.server.connect().await?;
+            // Connect first, on a circuit of its own: if the server (or Tor) is unreachable,
+            // nothing is built or stored.
+            let mut client = inner.server.connect(Purpose::Broadcast).await?;
             let mut db = inner.db.lock().await;
             let usk = inner.usk.as_ref().expect("checked above");
             let (txid, raw) =
                 tokio::task::block_in_place(|| send::build(&mut db, &inner.network, usk, request))?;
             drop(db);
+            if max_broadcast_delay > 0.0 {
+                tokio::time::sleep(send::random_delay(max_broadcast_delay)).await;
+            }
             send::broadcast(&mut client, raw).await?;
             Ok(txid)
         })
@@ -316,7 +335,7 @@ impl NativeWallet {
     fn sync<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let inner = Arc::clone(&self.inner);
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            let mut client = inner.server.connect().await?;
+            let mut client = inner.server.connect(Purpose::Sync).await?;
             let mut db = inner.db.lock().await;
             crate::sync::run(&mut client, &inner.network, &inner.cache, &mut db, &inner.path).await?;
             let scanned = db

@@ -89,3 +89,11 @@ async def test_bad_requests_fail_before_anything_is_built(tmp_path, devnet, fund
     with pytest.raises(ValueError, match="amount"):
         await sender.send(sender.address(), 0)
     assert sender.balance().total == FUNDING
+
+
+async def test_broadcast_delay_is_bounded(funded):
+    sender, _ = funded
+    with pytest.raises(ValueError, match="max_broadcast_delay"):
+        await sender.send(sender.address(), 10_000, max_broadcast_delay=-1)
+    with pytest.raises(ValueError, match="max_broadcast_delay"):
+        await sender.send(sender.address(), 10_000, max_broadcast_delay=7200)

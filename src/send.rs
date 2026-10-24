@@ -156,6 +156,13 @@ pub fn build(
     Ok((tx.txid().to_string(), raw))
 }
 
+/// A uniformly random delay in `[0, max_seconds)`, from the system CSPRNG.
+pub fn random_delay(max_seconds: f64) -> std::time::Duration {
+    use rand::Rng;
+    let unit = (UnwrapErr(SysRng).next_u64() >> 11) as f64 / (1u64 << 53) as f64;
+    std::time::Duration::from_secs_f64(unit * max_seconds)
+}
+
 pub async fn broadcast(client: &mut Client, raw: RawTransaction) -> PyResult<()> {
     let response = client
         .send_transaction(raw)
@@ -169,4 +176,17 @@ pub async fn broadcast(client: &mut Client, raw: RawTransaction) -> PyResult<()>
         )));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::random_delay;
+
+    #[test]
+    fn broadcast_delay_stays_in_range_and_varies() {
+        let delays: Vec<f64> = (0..200).map(|_| random_delay(30.0).as_secs_f64()).collect();
+        assert!(delays.iter().all(|d| (0.0..30.0).contains(d)));
+        let spread = delays.iter().cloned().fold(f64::MIN, f64::max) - delays.iter().cloned().fold(f64::MAX, f64::min);
+        assert!(spread > 15.0, "200 draws should cover most of the range, got spread {spread}");
+    }
 }

@@ -19,7 +19,7 @@ pyo3-async-runtimes = { version = "=0.30.0", features = ["tokio-runtime"] }
 # Zcash. Exact pins: the crates.io releases of 2026-10-21.
 # `transparent-inputs` is deliberately absent from every crate: the code that would query
 # the server about transparent addresses is not compiled into ZecPy at all.
-zcash_client_backend = { version = "=0.25.0", features = ["lightwalletd-tonic-tls-webpki-roots", "orchard", "sync"] }
+zcash_client_backend = { version = "=0.25.0", features = ["lightwalletd-tonic-tls-webpki-roots", "orchard", "sync", "tor"] }
 zcash_client_sqlite = { version = "=0.23.0", features = ["orchard"] }
 zcash_keys = { version = "=0.17.0", features = ["orchard", "sapling"] }
 orchard = { version = "=0.16.0", default-features = false }
@@ -36,7 +36,7 @@ zip321 = "=0.10.0"
 async-trait = "0.1"
 futures-util = "0.3"
 prost = "0.14"
-tokio = { version = "1.54", features = ["rt-multi-thread", "sync"] }
+tokio = { version = "1.54", features = ["rt-multi-thread", "sync", "time"] }
 tonic = { version = "0.14", features = ["tls-webpki-roots"] }
 
 # Keys and storage
