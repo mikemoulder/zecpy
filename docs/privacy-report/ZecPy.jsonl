@@ -1,0 +1,21 @@
+{"scenario": "create", "label": "public", "method": "GetLatestBlock", "reason": "chain tip, asked by every wallet", "request": {}, "time": 1792870048.455648}
+{"scenario": "create", "label": "coarse", "method": "GetTreeState", "reason": "tree state at 1: a 1000-block boundary every wallet crossing it asks for", "request": {"height": "1"}, "time": 1792870048.4681878}
+{"scenario": "first-sync", "label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792870049.8113465}
+{"scenario": "first-sync", "label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792870049.8220298}
+{"scenario": "first-sync", "label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792870049.831009}
+{"scenario": "first-sync", "label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792870049.8405764}
+{"scenario": "first-sync", "label": "coarse", "method": "GetTreeState", "reason": "tree state at 1: a 1000-block boundary every wallet crossing it asks for", "request": {"height": "1"}, "time": 1792870049.8650436}
+{"scenario": "first-sync", "label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "999"}, "start": {"height": "2"}}, "time": 1792870049.8768244}
+{"scenario": "first-sync", "label": "coarse", "method": "GetTreeState", "reason": "tree state at 999: a 1000-block boundary every wallet crossing it asks for", "request": {"height": "999"}, "time": 1792870052.3659863}
+{"scenario": "first-sync", "label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "1132"}, "start": {"height": "1000"}}, "time": 1792870052.391055}
+{"scenario": "receive", "label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792870110.3418539}
+{"scenario": "receive", "label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792870110.3552248}
+{"scenario": "receive", "label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792870110.3613868}
+{"scenario": "receive", "label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792870110.3673823}
+{"scenario": "receive", "label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "1143"}, "start": {"height": "1133"}}, "time": 1792870110.4405458}
+{"scenario": "restart", "label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792870118.1698847}
+{"scenario": "restart", "label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792870118.1916053}
+{"scenario": "restart", "label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792870118.1981146}
+{"scenario": "restart", "label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792870118.2049522}
+{"scenario": "restart", "label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "1145"}, "start": {"height": "1144"}}, "time": 1792870118.2429411}
+{"scenario": "send", "label": "broadcast", "method": "SendTransaction", "reason": "publishes a transaction", "request": {"data_bytes": 9166, "height": null}, "time": 1792870127.4534197}

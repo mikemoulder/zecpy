@@ -1,7 +1,8 @@
 """Light Wallet Privacy Report: the same five scenarios, run by each wallet through the
 audit proxy on the local regtest chain, with every request recorded and classified.
 
-    python -m tools.leak_audit.report            # needs devnet/up.sh running
+    python -m tools.leak_audit.report              # needs devnet/up.sh running
+    python -m tools.leak_audit.report --from-logs  # rebuild the document from the raw logs
 
 Writes docs/privacy-report.md and the raw request logs in docs/privacy-report/.
 """
@@ -137,7 +138,7 @@ async def _exec(*argv: str, stdin: bytes = b"", cwd: Path | None = None, timeout
 
 class Devtool(Driver):
     name = "zcash-devtool"
-    version = "0b3436b (librustzcash sync::run, transparent support on)"
+    version = "0b3436b (its own sync loop on the librustzcash crates, transparent support on)"
 
     def _cmd(self, *args: str) -> list[str]:
         return [str(DEV / "bin" / "zcash-devtool"), "wallet", "-w", str(self.workdir / "w"), *args]
@@ -169,34 +170,80 @@ class Devtool(Driver):
 class Zingo(Driver):
     name = "zingo-cli"
     version = (
-        "zingolib 625f617 (pepper-sync), built with its `nakednet-test-mode` measurement feature: "
-        "by default zingo-cli routes sends over the Nym mixnet, which a loopback proxy cannot observe"
+        "zingolib 625f617 (pepper-sync), built with its `nakednet-test-mode` measurement feature "
+        "and without `nym`: by default zingo-cli sends over the Nym mixnet, which a loopback "
+        "proxy cannot observe. Driven through its interactive prompt; each scenario is a new process"
     )
 
-    def _cmd(self, *args: str, sync: bool) -> list[str]:
-        mode = ["--waitsync"] if sync else ["--nosync"]
-        return [str(DEV / "bin" / "zingo-cli-measure"), "--chain", "regtest", "--server", self.server,
-                "--data-dir", str(self.workdir / "w"), *mode, *args]
+    async def _session(self, *commands: str, sync: bool, done: str | None = None, timeout: float = 300) -> str:
+        """Runs one zingo-cli session: optionally `sync run` until the scan reaches 100%, then
+        the given commands (waiting for `done` to appear in the output), then `quit`."""
+        proc = await asyncio.create_subprocess_exec(
+            str(DEV / "bin" / "zingo-cli-measure"), "--chain", "regtest", "--server", self.server,
+            "--data-dir", str(self.workdir / "w"), "--nosync",
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+        )
+        out: list[str] = []
+
+        async def read() -> None:
+            assert proc.stdout is not None
+            while line := await proc.stdout.readline():
+                out.append(line.decode())
+
+        async def say(command: str) -> None:
+            assert proc.stdin is not None
+            proc.stdin.write(command.encode() + b"\n")
+            await proc.stdin.drain()
+
+        async def wait_for(marker: str) -> None:
+            mark = len(out)
+            while marker not in "".join(out[mark:]):
+                await asyncio.sleep(0.5)
+
+        reader = asyncio.create_task(read())
+        try:
+            async with asyncio.timeout(timeout):
+                if sync:
+                    await say("sync run")
+                    while True:
+                        mark = len(out)
+                        await say("sync status")
+                        await asyncio.sleep(2)
+                        if '"percentage_total_blocks_scanned": 100' in "".join(out[mark:]):
+                            break
+                for command in commands:
+                    await say(command)
+                    if done:
+                        await wait_for(done)
+                await say("quit")
+                await proc.wait()
+        finally:
+            if proc.returncode is None:
+                proc.kill()
+            await reader
+        return "".join(out)
 
     async def create(self) -> None:
         (self.workdir / "w").mkdir()
-        await _exec(*self._cmd("addresses", sync=False))
+        await self._session("addresses", sync=False, done="encoded_address")
 
     async def sync(self) -> None:
-        await _exec(*self._cmd("height", sync=True))
+        await self._session(sync=True)
 
     async def restart(self) -> None:
-        pass  # every zingo-cli command is a fresh process
+        pass  # every scenario is already a fresh zingo-cli process
 
     async def address(self) -> str:
-        out = await _exec(*self._cmd("addresses", sync=False))
+        out = await self._session("addresses", sync=False, done="encoded_address")
         for word in out.replace('"', " ").replace(",", " ").split():
             if word.startswith("uregtest1"):
                 return word
         raise RuntimeError(f"no regtest address in zingo-cli output: {out[-300:]}")
 
     async def send(self, to: str, zatoshis: int) -> None:
-        await _exec(*self._cmd("quicksend", to, str(zatoshis), sync=False))
+        out = await self._session(f"quicksend {to} {zatoshis}", sync=False, done="txid")
+        if "error" in out.lower() and "txid" not in out:
+            raise RuntimeError(f"zingo-cli quicksend failed: {out[-300:]}")
 
 
 DRIVERS: list[type[Driver]] = [ZecPy, Devtool, Zingo]
@@ -245,6 +292,25 @@ def write_report(runs: list[Run]) -> Path:
         1 for recs in r.records.values() for x in recs if x.label is Label.IDENTIFYING
     )
     lines.append("| **Total identifying** | " + " | ".join(f"**{total(r)}**" for r in runs) + " |")
+    lines += [
+        "",
+        "## Reading this fairly",
+        "",
+        "- **Scope.** This measures what request *content* reveals. It does not measure who is",
+        "  connecting: zingo-cli sends over the Nym mixnet by default, and ZecPy sends and syncs",
+        "  over Tor by default. Neither protection is visible to a loopback proxy, so both were",
+        "  measured without them.",
+        "- **Transparent support is a trade-off.** zingo-cli and zcash-devtool can receive to",
+        "  transparent addresses, and asking the server about those addresses",
+        "  (`GetTaddressTxids`, `GetAddressUtxosStream`) is how a light wallet finds such funds.",
+        "  ZecPy is shielded-only by design: it never issues these requests, and it cannot",
+        "  receive transparent funds.",
+        "- **Memos.** zingo-cli fetches received transactions by txid (`GetTransaction`), for example",
+        "  to read their memos. ZecPy does not read incoming memos; its invoices match payments by",
+        "  receiving address instead.",
+        "- **Counts depend on the chain.** zingo-cli's transparent lookups scale with its",
+        "  address gap limit; tree-state requests scale with the number of sync batches.",
+    ]
     lines += ["", "## Versions", ""]
     lines += [f"- **{r.wallet}**: {r.version}" for r in runs]
     lines += ["", "## What the identifying requests reveal", ""]
@@ -268,8 +334,28 @@ def write_report(runs: list[Run]) -> Path:
     return path
 
 
+def load_runs() -> list[Run]:
+    """Rebuilds the runs from the raw logs, to regenerate the document without rerunning."""
+    runs = []
+    for driver in DRIVERS:
+        log = OUT_DIR / f"{driver.name}.jsonl"
+        if not log.exists():
+            continue
+        run = Run(driver.name, driver.version)
+        for line in log.read_text().splitlines():
+            data = json.loads(line)
+            record = Record(data["time"], data["method"], Label(data["label"]), data["reason"], data["request"])
+            run.records.setdefault(data["scenario"], []).append(record)
+        runs.append(run)
+    return runs
+
+
 async def main() -> None:
     import sys
+
+    if "--from-logs" in sys.argv:
+        print(f"wrote {write_report(load_runs())}")
+        return
 
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     drivers = [d for d in DRIVERS if only is None or d.name == only]
