@@ -27,6 +27,11 @@ bytes unchanged, decodes a copy of every request, and labels it:
 Unknown methods are labelled identifying, so the audit fails closed. The proxy runs
 outside the wallet, so its record does not depend on the wallet reporting on itself.
 
+The audit inspects request *content*. Tor cannot reach a loopback proxy, so the audit runs
+without Tor; the network path is covered separately: `tests/test_network_tor.py` creates and
+syncs a public-testnet wallet through Tor, and circuit separation relies on arti's
+`isolated_client`, which guarantees that two handles never share a circuit.
+
 `tests/test_devnet_leak_audit.py` runs a merchant's full cycle through the proxy on the
 local regtest chain and asserts on the record:
 
@@ -51,6 +56,8 @@ one.
 | Where the last sync stopped (`GetTreeState` at every batch start) | Sent on every incremental sync by librustzcash `sync::run`; links sessions | Own sync loop: the tip's tree state comes from `GetLatestTreeState` and is saved for the next sync; adjacent ranges merge; batches split only at multiples of 1,000 |
 | Memo and transaction-detail fetches (`GetTransaction` by txid) | Sent to read memos and fill in history | Never sent. Invoices match payments by receiving address, so memos are not needed |
 | Payments to transparent addresses | Allowed | Refused with `PrivacyError` unless `allow_transparent=True` |
+| Network path linking sync and send | One connection, or one Tor circuit, for everything | Every sync session and every broadcast gets its own isolated Tor circuit; a failed circuit is retried on a fresh one, never directly |
+| Broadcast timing | Published the moment it is built | Optional `max_broadcast_delay`: published after a random delay from the system CSPRNG |
 
 ## What the server still learns
 
@@ -58,9 +65,10 @@ one.
 - **The transaction, when the wallet sends one.** `SendTransaction` publishes it, which is
   unavoidable. The transaction itself is shielded: amounts, sender and recipient are not
   visible.
-- **The network address of the wallet.** ZecPy refuses remote servers unless the caller
-  passes `tor=False`. Tor transport is in progress and not yet in this build, so today a
-  remote server sees the caller's IP. Loopback servers are always direct.
+- **A Tor exit's address, not the wallet's.** Remote servers are reached over Tor by
+  default (arti, via `zcash_client_backend`'s `tor` feature), and `.onion` servers are
+  supported. With `tor=False` the server sees the caller's IP; that is an explicit opt-out.
+  Loopback servers are always direct.
 - **One exact-height tree-state request after a reorg.** When the chain reorganises, the
   wallet rewinds and must fetch the tree state at the rewind height. Reorgs are rare and
   the audit reports this request as identifying rather than hiding it.
