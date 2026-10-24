@@ -342,33 +342,23 @@ impl NativeWallet {
         allow_transparent: bool,
         max_broadcast_delay: f64,
     ) -> PyResult<Bound<'py, PyAny>> {
-        if !(0.0..=3600.0).contains(&max_broadcast_delay) {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                "max_broadcast_delay must be between 0 and 3600 seconds",
-            ));
-        }
-        let inner = Arc::clone(&self.inner);
-        if inner.usk.is_none() {
-            return Err(WalletError::new_err(
-                "this wallet is watch-only; open it with its mnemonic to send",
-            ));
-        }
-        let request = SendRequest::new(&inner.network, to, amount_zat, memo.as_deref(), allow_transparent)?;
-        pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            // Connect first, on a circuit of its own: if the server (or Tor) is unreachable,
-            // nothing is built or stored.
-            let mut client = inner.server.connect(Purpose::Broadcast).await?;
-            let mut db = inner.db.lock().await;
-            let usk = inner.usk.as_ref().expect("checked above");
-            let (txid, raw) =
-                tokio::task::block_in_place(|| send::build(&mut db, &inner.network, usk, request))?;
-            drop(db);
-            if max_broadcast_delay > 0.0 {
-                tokio::time::sleep(send::random_delay(max_broadcast_delay)).await;
-            }
-            send::broadcast(&mut client, raw).await?;
-            Ok(txid)
-        })
+        let request = SendRequest::new(&self.inner.network, to, amount_zat, memo.as_deref(), allow_transparent)?;
+        self.send_request(py, request, max_broadcast_delay)
+    }
+
+    /// Pays several recipients in one transaction: cheaper than separate sends, and an
+    /// observer sees one transaction instead of several sent together. Each payment is
+    /// `(address, amount_zat, memo)`.
+    #[pyo3(signature = (payments, allow_transparent=false, max_broadcast_delay=0.0))]
+    fn send_many<'py>(
+        &self,
+        py: Python<'py>,
+        payments: Vec<(String, u64, Option<String>)>,
+        allow_transparent: bool,
+        max_broadcast_delay: f64,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let request = SendRequest::many(&self.inner.network, &payments, allow_transparent)?;
+        self.send_request(py, request, max_broadcast_delay)
     }
 
     /// The shielded address at a specific diversifier index. Invoices use indices from their
@@ -406,12 +396,20 @@ impl NativeWallet {
         memo: Option<String>,
         allow_transparent: bool,
     ) -> PyResult<Vec<u8>> {
-        let inner = Arc::clone(&self.inner);
-        let request = SendRequest::new(&inner.network, to, amount_zat, memo.as_deref(), allow_transparent)?;
-        py.detach(move || {
-            let mut db = inner.db.blocking_lock();
-            send::build_pczt(&mut db, &inner.network, request)
-        })
+        let request = SendRequest::new(&self.inner.network, to, amount_zat, memo.as_deref(), allow_transparent)?;
+        self.propose_request(py, request)
+    }
+
+    /// `propose_cold` for several recipients in one transaction.
+    #[pyo3(signature = (payments, allow_transparent=false))]
+    fn propose_cold_many(
+        &self,
+        py: Python<'_>,
+        payments: Vec<(String, u64, Option<String>)>,
+        allow_transparent: bool,
+    ) -> PyResult<Vec<u8>> {
+        let request = SendRequest::many(&self.inner.network, &payments, allow_transparent)?;
+        self.propose_request(py, request)
     }
 
     /// Extracts the transaction from a PCZT the cold signer signed, records it and
@@ -529,5 +527,49 @@ impl NativeWallet {
     #[getter]
     fn network(&self) -> &'static str {
         self.inner.network.name()
+    }
+}
+
+impl NativeWallet {
+    fn send_request<'py>(
+        &self,
+        py: Python<'py>,
+        request: SendRequest,
+        max_broadcast_delay: f64,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        if !(0.0..=3600.0).contains(&max_broadcast_delay) {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "max_broadcast_delay must be between 0 and 3600 seconds",
+            ));
+        }
+        let inner = Arc::clone(&self.inner);
+        if inner.usk.is_none() {
+            return Err(WalletError::new_err(
+                "this wallet is watch-only; open it with its mnemonic to send",
+            ));
+        }
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            // Connect first, on a circuit of its own: if the server (or Tor) is unreachable,
+            // nothing is built or stored.
+            let mut client = inner.server.connect(Purpose::Broadcast).await?;
+            let mut db = inner.db.lock().await;
+            let usk = inner.usk.as_ref().expect("checked above");
+            let (txid, raw) =
+                tokio::task::block_in_place(|| send::build(&mut db, &inner.network, usk, request))?;
+            drop(db);
+            if max_broadcast_delay > 0.0 {
+                tokio::time::sleep(send::random_delay(max_broadcast_delay)).await;
+            }
+            send::broadcast(&mut client, raw).await?;
+            Ok(txid)
+        })
+    }
+
+    fn propose_request(&self, py: Python<'_>, request: SendRequest) -> PyResult<Vec<u8>> {
+        let inner = Arc::clone(&self.inner);
+        py.detach(move || {
+            let mut db = inner.db.blocking_lock();
+            send::build_pczt(&mut db, &inner.network, request)
+        })
     }
 }

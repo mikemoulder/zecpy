@@ -11,7 +11,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Mapping
+from typing import TYPE_CHECKING, Iterable, Mapping
 
 from ._native import Balance, NativeWallet
 from .invoices import Invoices
@@ -210,6 +210,30 @@ class Wallet:
         """
         return await self._native.send(to, amount_zat, memo, allow_transparent, max_broadcast_delay)
 
+    async def send_many(
+        self,
+        payments: "Iterable[Payout | tuple[str, int] | tuple[str, int, str | None]]",
+        *,
+        allow_transparent: bool = False,
+        max_broadcast_delay: float = 0.0,
+    ) -> str:
+        """Pays up to 50 recipients in one transaction and returns its txid.
+
+        Cheaper than separate sends, and an observer sees one shielded transaction instead
+        of several sent together. Every payment is validated before anything is built; one
+        bad entry rejects the batch and names its position.
+        """
+        return await self._native.send_many(_payouts(payments), allow_transparent, max_broadcast_delay)
+
+    def propose_cold_many(
+        self,
+        payments: "Iterable[Payout | tuple[str, int] | tuple[str, int, str | None]]",
+        *,
+        allow_transparent: bool = False,
+    ) -> bytes:
+        """``send_many`` as an unsigned PCZT for a cold signer."""
+        return bytes(self._native.propose_cold_many(_payouts(payments), allow_transparent))
+
     def propose_cold(
         self,
         to: str,
@@ -231,6 +255,26 @@ class Wallet:
 
     def __repr__(self) -> str:
         return f"Wallet(path={str(self.path)!r}, network={self.network!r})"
+
+
+@dataclass(frozen=True)
+class Payout:
+    """One recipient of a batch payment."""
+
+    address: str
+    amount_zat: int
+    memo: str | None = None
+
+
+def _payouts(payments: "Iterable[Payout | tuple]") -> list[tuple[str, int, str | None]]:
+    out = []
+    for p in payments:
+        if isinstance(p, Payout):
+            out.append((p.address, p.amount_zat, p.memo))
+        else:
+            address, amount, *rest = p
+            out.append((address, amount, rest[0] if rest else None))
+    return out
 
 
 def _prepare_new(path: str | os.PathLike[str]) -> Path:

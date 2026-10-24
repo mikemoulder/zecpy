@@ -2,7 +2,7 @@
 
 from ._native import Balance, NetworkError, PrivacyError, WalletError, ZecPyError
 from .invoices import Invoice, Invoices, InvoiceStatus, PaymentEvent
-from .wallet import Mnemonic, Wallet
+from .wallet import Mnemonic, Payout, Wallet
 
 __all__ = [
     "Balance",
@@ -13,6 +13,7 @@ __all__ = [
     "Mnemonic",
     "NetworkError",
     "PaymentEvent",
+    "Payout",
     "PrivacyError",
     "Wallet",
     "WalletError",

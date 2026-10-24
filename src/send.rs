@@ -60,6 +60,10 @@ pub struct SendRequest {
     request: TransactionRequest,
 }
 
+/// Most recipients a single ZecPy transaction pays. Bounds proving time and memory; larger
+/// payrolls go out in several transactions.
+pub const MAX_RECIPIENTS: usize = 50;
+
 impl SendRequest {
     pub fn new(
         network: &Network,
@@ -68,39 +72,76 @@ impl SendRequest {
         memo: Option<&str>,
         allow_transparent: bool,
     ) -> PyResult<Self> {
-        let recipient = Address::decode(network, to).ok_or_else(|| {
-            PyValueError::new_err(format!(
-                "{to:?} is not a valid {} address",
-                network.name()
-            ))
-        })?;
-        let recipient: ZcashAddress = recipient.to_zcash_address(network);
-        if recipient.is_transparent_only() && !allow_transparent {
-            return Err(PrivacyError::new_err(
-                "refusing to pay a transparent-only address: the amount and recipient would be \
-                 public on chain. Pass allow_transparent=True to send anyway",
-            ));
+        Self::many(network, &[(to.to_string(), amount_zat, memo.map(str::to_string))], allow_transparent)
+    }
+
+    /// One transaction paying several recipients. Every payment is validated before anything
+    /// is built: one bad entry rejects the whole batch, naming its position.
+    pub fn many(
+        network: &Network,
+        payments: &[(String, u64, Option<String>)],
+        allow_transparent: bool,
+    ) -> PyResult<Self> {
+        if payments.is_empty() || payments.len() > MAX_RECIPIENTS {
+            return Err(PyValueError::new_err(format!(
+                "a transaction pays between 1 and {MAX_RECIPIENTS} recipients"
+            )));
         }
-        let amount = Zatoshis::from_u64(amount_zat)
-            .ok()
-            .filter(|z| !z.is_zero())
-            .ok_or_else(|| PyValueError::new_err("amount must be between 1 zatoshi and 21M ZEC"))?;
-        let memo = memo
-            .map(|text| {
-                Memo::from_str(text)
-                    .map(MemoBytes::from)
-                    .map_err(|_| PyValueError::new_err("memo is longer than 512 bytes"))
+        let payments = payments
+            .iter()
+            .enumerate()
+            .map(|(i, (to, amount, memo))| {
+                payment(network, to, *amount, memo.as_deref(), allow_transparent).map_err(|e| {
+                    if payments.len() == 1 {
+                        e
+                    } else {
+                        Python::attach(|py| {
+                            let message = e.value(py).to_string();
+                            PyErr::from_type(e.get_type(py), format!("payment {i}: {message}"))
+                        })
+                    }
+                })
             })
-            .transpose()?;
-        if memo.is_some() && !recipient.can_receive_memo() {
-            return Err(PyValueError::new_err("this recipient cannot receive a memo"));
-        }
-        let payment = Payment::new(recipient, Some(amount), memo, None, None, vec![])
-            .map_err(|e| PyValueError::new_err(format!("invalid payment: {e:?}")))?;
-        let request = TransactionRequest::new(vec![payment])
+            .collect::<PyResult<Vec<_>>>()?;
+        let request = TransactionRequest::new(payments)
             .map_err(|e| PyValueError::new_err(format!("invalid payment request: {e:?}")))?;
         Ok(SendRequest { request })
     }
+}
+
+fn payment(
+    network: &Network,
+    to: &str,
+    amount_zat: u64,
+    memo: Option<&str>,
+    allow_transparent: bool,
+) -> PyResult<Payment> {
+    let recipient = Address::decode(network, to).ok_or_else(|| {
+        PyValueError::new_err(format!("{to:?} is not a valid {} address", network.name()))
+    })?;
+    let recipient: ZcashAddress = recipient.to_zcash_address(network);
+    if recipient.is_transparent_only() && !allow_transparent {
+        return Err(PrivacyError::new_err(
+            "refusing to pay a transparent-only address: the amount and recipient would be \
+             public on chain. Pass allow_transparent=True to send anyway",
+        ));
+    }
+    let amount = Zatoshis::from_u64(amount_zat)
+        .ok()
+        .filter(|z| !z.is_zero())
+        .ok_or_else(|| PyValueError::new_err("amount must be between 1 zatoshi and 21M ZEC"))?;
+    let memo = memo
+        .map(|text| {
+            Memo::from_str(text)
+                .map(MemoBytes::from)
+                .map_err(|_| PyValueError::new_err("memo is longer than 512 bytes"))
+        })
+        .transpose()?;
+    if memo.is_some() && !recipient.can_receive_memo() {
+        return Err(PyValueError::new_err("this recipient cannot receive a memo"));
+    }
+    Payment::new(recipient, Some(amount), memo, None, None, vec![])
+        .map_err(|e| PyValueError::new_err(format!("invalid payment: {e:?}")))
 }
 
 type WalletProposal = Proposal<StandardFeeRule, ReceivedNoteId>;
