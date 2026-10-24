@@ -28,10 +28,8 @@ use crate::send::{self, SendRequest};
 
 pub type Db = WalletDb<rusqlite::Connection, Network, SystemClock, UnwrapErr<SysRng>>;
 
-/// Blocks downloaded and scanned per batch during sync.
-const SYNC_BATCH: u32 = 1_000;
-
-/// Birthdays are rounded down to a multiple of this many blocks before the wallet asks the
+/// Birthdays are rounded down to a multiple of this many blocks (itself a multiple of
+/// `sync::BATCH`, so the birthday tree-state request looks like any batch boundary) before the wallet asks the
 /// server for the tree state there, so the request reveals only a coarse creation window
 /// (about 8.7 days on Mainnet) instead of the exact block.
 const BIRTHDAY_BUCKET: u32 = 10_000;
@@ -320,9 +318,7 @@ impl NativeWallet {
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             let mut client = inner.server.connect().await?;
             let mut db = inner.db.lock().await;
-            zcash_client_backend::sync::run(&mut client, &inner.network, &inner.cache, &mut *db, SYNC_BATCH)
-                .await
-                .map_err(error::wallet("sync failed"))?;
+            crate::sync::run(&mut client, &inner.network, &inner.cache, &mut db, &inner.path).await?;
             let scanned = db
                 .block_fully_scanned()
                 .map_err(error::wallet("cannot read scan progress"))?

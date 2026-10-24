@@ -7,6 +7,7 @@ mod net;
 mod network;
 mod received;
 mod send;
+mod sync;
 mod wallet;
 
 use pyo3::prelude::*;
