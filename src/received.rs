@@ -34,7 +34,7 @@ fn pool_name(code: i64) -> Option<&'static str> {
     }
 }
 
-fn diversifier_from_be(bytes: &[u8]) -> Option<u128> {
+pub(crate) fn diversifier_from_be(bytes: &[u8]) -> Option<u128> {
     (bytes.len() <= 16).then(|| bytes.iter().fold(0u128, |acc, b| (acc << 8) | u128::from(*b)))
 }
 

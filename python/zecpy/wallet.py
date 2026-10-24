@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Mapping
 
-from ._native import Balance, NativeWallet
+from ._native import Balance, MemoReport, NativeWallet, PaymentRequest, Proposal, Transaction
 from .invoices import Invoices
 
 if TYPE_CHECKING:
@@ -180,6 +180,20 @@ class Wallet:
         """Scans the chain up to its tip. Returns the height the wallet is synced to."""
         return await self._native.sync()
 
+    async def fetch_memos(self, *, decoys: int = 7, max_delay: float = 10.0) -> MemoReport:
+        """Fetches the memos of received payments. Opt-in: nothing calls it for you.
+
+        Compact blocks do not carry memos, so each memo needs its full transaction, requested
+        by txid. ZecPy never requests a txid alone: each real request is shuffled among
+        ``decoys`` nearby shielded transactions, placed so the real one's rank in the set is
+        uniform, on a Tor circuit used for nothing else, after a random delay of up to
+        ``max_delay`` seconds. Raises ``PrivacyError`` without Tor unless the server runs on
+        this machine. A payment waits until enough blocks have been scanned to hide it.
+
+        Invoices do not need this: they match payments by address, not by memo.
+        """
+        return await self._native.fetch_memos(decoys, max_delay)
+
     def balance(self) -> Balance:
         """Balances in zatoshis, split by pool and by spendability."""
         return self._native.balance()
@@ -188,6 +202,18 @@ class Wallet:
         """A fresh Unified Address with shielded receivers only."""
         return self._native.address()
 
+    def transactions(self, since: int = 0) -> list[Transaction]:
+        """The wallet's transactions first seen at or after height ``since``, newest first.
+
+        Read from the local database only: listing history sends nothing to the server.
+        Memos the wallet sent are included; outputs hide memo contents from their repr.
+        """
+        return self._native.transactions(since)
+
+    def transaction(self, txid: str) -> Transaction | None:
+        """One transaction by txid, or None if the wallet has no record of it. Local only."""
+        return self._native.transaction(txid)
+
     async def send(
         self,
         to: str,
@@ -195,6 +221,7 @@ class Wallet:
         memo: str | None = None,
         *,
         allow_transparent: bool = False,
+        allow_pool_crossing: bool = False,
         max_broadcast_delay: float = 0.0,
     ) -> str:
         """Pays ``amount_zat`` zatoshis to ``to`` and returns the txid.
@@ -207,14 +234,21 @@ class Wallet:
         ``max_broadcast_delay`` holds the finished transaction for a random time up to that
         many seconds before publishing it, so it does not appear on the network at the
         moment of the action that caused it (a checkout, a payroll run).
+
+        A payment that would move value between shielded pools (Orchard notes paying an
+        Ironwood receiver) publishes the crossing amount, so it raises ``PrivacyError``
+        unless ``allow_pool_crossing`` is set. ZIP 318 canonical migrations are allowed.
         """
-        return await self._native.send(to, amount_zat, memo, allow_transparent, max_broadcast_delay)
+        return await self._native.send(
+            to, amount_zat, memo, allow_transparent, max_broadcast_delay, allow_pool_crossing
+        )
 
     async def send_many(
         self,
         payments: "Iterable[Payout | tuple[str, int] | tuple[str, int, str | None]]",
         *,
         allow_transparent: bool = False,
+        allow_pool_crossing: bool = False,
         max_broadcast_delay: float = 0.0,
     ) -> str:
         """Pays up to 50 recipients in one transaction and returns its txid.
@@ -223,16 +257,104 @@ class Wallet:
         of several sent together. Every payment is validated before anything is built; one
         bad entry rejects the batch and names its position.
         """
-        return await self._native.send_many(_payouts(payments), allow_transparent, max_broadcast_delay)
+        return await self._native.send_many(
+            _payouts(payments), allow_transparent, max_broadcast_delay, allow_pool_crossing
+        )
+
+    def parse_request(self, uri: str) -> PaymentRequest:
+        """Parses a ZIP-321 payment request (``zcash:...``) for display before paying it.
+
+        Labels and messages are written by whoever made the link: show them, never act on
+        them. Unknown required (``req-``) parameters make the request invalid, as ZIP-321
+        demands. Local only.
+        """
+        return self._native.parse_request(uri)
+
+    async def pay(
+        self,
+        uri: str,
+        *,
+        max_zat: int,
+        allow_transparent: bool = False,
+        allow_pool_crossing: bool = False,
+        max_broadcast_delay: float = 0.0,
+    ) -> str:
+        """Pays a ZIP-321 payment request and returns the txid.
+
+        ``max_zat`` is required: a request asking for more in total raises ``PrivacyError``
+        before anything is built, so a bot or agent paying links it was handed cannot be
+        talked into an amount it did not budget for. A request without an amount is refused
+        rather than guessed. Every payment gets the same checks as ``send``.
+        """
+        return await self._native.pay(
+            uri, max_zat, allow_transparent, allow_pool_crossing, max_broadcast_delay
+        )
+
+    def propose(
+        self,
+        to: str,
+        amount_zat: int,
+        memo: str | None = None,
+        *,
+        allow_transparent: bool = False,
+        allow_pool_crossing: bool = False,
+    ) -> Proposal:
+        """Plans a payment without building it: fee, notes spent, change, and any value it
+        would make public by crossing pools. Local only. Send it with ``send_proposal``.
+
+        The same refusals as ``send`` apply here, before anything is shown.
+        """
+        return self._native.propose([(to, amount_zat, memo)], allow_transparent, allow_pool_crossing)
+
+    def propose_many(
+        self,
+        payments: "Iterable[Payout | tuple[str, int] | tuple[str, int, str | None]]",
+        *,
+        allow_transparent: bool = False,
+        allow_pool_crossing: bool = False,
+    ) -> Proposal:
+        """``propose`` for up to 50 recipients in one transaction."""
+        return self._native.propose(_payouts(payments), allow_transparent, allow_pool_crossing)
+
+    def propose_sweep(
+        self,
+        to: str,
+        memo: str | None = None,
+        *,
+        mode: str = "spendable",
+        allow_transparent: bool = False,
+        allow_pool_crossing: bool = False,
+    ) -> Proposal:
+        """Plans sending everything to ``to``, the fee taken out of it. Local only.
+
+        ``mode="spendable"`` sends what is spendable now and leaves notes still waiting for
+        confirmations. ``mode="everything"`` raises ``WalletError`` instead of leaving
+        anything behind, for when the wallet must really end up empty. Spends Orchard and
+        Ironwood notes; Sapling notes, which ZecPy only receives, stay where they are.
+        """
+        if mode not in ("spendable", "everything"):
+            raise ValueError('mode must be "spendable" or "everything"')
+        return self._native.propose_sweep(
+            to, memo, mode == "everything", allow_transparent, allow_pool_crossing
+        )
+
+    async def send_proposal(self, proposal: Proposal, *, max_broadcast_delay: float = 0.0) -> str:
+        """Builds, signs and broadcasts exactly the transaction ``proposal`` describes, so
+        the fee paid is the fee shown. Raises ``WalletError``, building nothing, if a note
+        it spends was spent or rolled back since it was proposed; propose again."""
+        return await self._native.send_proposal(proposal, max_broadcast_delay)
 
     def propose_cold_many(
         self,
         payments: "Iterable[Payout | tuple[str, int] | tuple[str, int, str | None]]",
         *,
         allow_transparent: bool = False,
+        allow_pool_crossing: bool = False,
     ) -> bytes:
         """``send_many`` as an unsigned PCZT for a cold signer."""
-        return bytes(self._native.propose_cold_many(_payouts(payments), allow_transparent))
+        return bytes(
+            self._native.propose_cold_many(_payouts(payments), allow_transparent, allow_pool_crossing)
+        )
 
     def propose_cold(
         self,
@@ -241,13 +363,16 @@ class Wallet:
         memo: str | None = None,
         *,
         allow_transparent: bool = False,
+        allow_pool_crossing: bool = False,
     ) -> bytes:
         """Builds and proves an unsigned transaction (a PCZT) for a cold signer.
 
         Works on watch-only wallets: Orchard and Ironwood proofs need no secret. The same
         privacy rules as ``send`` apply.
         """
-        return bytes(self._native.propose_cold(to, amount_zat, memo, allow_transparent))
+        return bytes(
+            self._native.propose_cold(to, amount_zat, memo, allow_transparent, allow_pool_crossing)
+        )
 
     async def broadcast_signed(self, signed_pczt: bytes, *, max_broadcast_delay: float = 0.0) -> str:
         """Publishes a transaction the cold signer signed, on a Tor circuit of its own."""

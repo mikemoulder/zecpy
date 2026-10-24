@@ -33,6 +33,8 @@ pub enum Purpose {
     Sync,
     /// Publishing a transaction.
     Broadcast,
+    /// Fetching one received transaction among its decoys (memos.rs).
+    MemoFetch,
 }
 
 #[derive(Clone)]
@@ -64,6 +66,12 @@ impl Server {
     fn is_loopback(&self) -> bool {
         let host = self.uri.host().unwrap_or_default().trim_matches(['[', ']']);
         host == "localhost" || host.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback())
+    }
+
+    /// Whether requests that identify the wallet's transactions may be sent: only over Tor,
+    /// or to a server on this machine, which the caller runs.
+    pub fn may_identify(&self) -> bool {
+        self.uses_tor() || self.is_loopback()
     }
 
     /// Whether connections to this server go through Tor.

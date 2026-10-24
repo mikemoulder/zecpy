@@ -144,7 +144,13 @@ fn batches(segment: &Range<BlockHeight>) -> Vec<Range<BlockHeight>> {
     out
 }
 
-async fn download(client: &mut Client, cache: &MemoryBlockCache, range: &Range<BlockHeight>) -> PyResult<()> {
+/// Downloads a batch into the cache. Returns the shielded txids per block, which serve as
+/// memo-fetch decoys (memos.rs) at no extra request.
+async fn download(
+    client: &mut Client,
+    cache: &MemoryBlockCache,
+    range: &Range<BlockHeight>,
+) -> PyResult<crate::memos::BlockTxids> {
     let request = BlockRange {
         start: Some(BlockId { height: u64::from(range.start), hash: vec![] }),
         end: Some(BlockId { height: u64::from(range.end - 1), hash: vec![] }),
@@ -158,8 +164,9 @@ async fn download(client: &mut Client, cache: &MemoryBlockCache, range: &Range<B
         .try_collect::<Vec<_>>()
         .await
         .map_err(error::network("GetBlockRange stream failed"))?;
+    let txids = crate::memos::shielded_txids(&blocks);
     cache.insert(blocks).await.expect("memory cache cannot fail");
-    Ok(())
+    Ok(txids)
 }
 
 /// Brings the wallet up to the chain tip.
@@ -220,7 +227,7 @@ pub async fn run(
                     Some(state) if state.block_height() == prior => state,
                     _ => fetch_tree_state(client, prior).await?,
                 };
-                download(client, cache, &batch).await?;
+                let txids = download(client, cache, &batch).await?;
                 let scanned = scan_cached_blocks(
                     network,
                     cache,
@@ -237,7 +244,7 @@ pub async fn run(
                     .await
                     .expect("memory cache cannot fail");
                 match scanned {
-                    Ok(_) => {}
+                    Ok(_) => crate::memos::record(db_path, &txids)?,
                     Err(ChainError::Scan(err)) if err.is_continuity_error() => {
                         let rewind = err.at_height().saturating_sub(REORG_REWIND_MARGIN);
                         db.truncate_to_height(rewind)

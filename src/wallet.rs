@@ -25,7 +25,7 @@ use crate::cache::MemoryBlockCache;
 use crate::error::{self, PrivacyError, WalletError};
 use crate::net::{Client, Purpose, Server};
 use crate::network::Network;
-use crate::received;
+use crate::{history, memos, received};
 use crate::send::{self, SendRequest};
 
 pub type Db = WalletDb<rusqlite::Connection, Network, SystemClock, UnwrapErr<SysRng>>;
@@ -332,7 +332,8 @@ impl NativeWallet {
     /// With `max_broadcast_delay`, the finished transaction waits a uniformly random time up
     /// to that many seconds before it is published, so its appearance on the network is not
     /// timed to the action that caused it.
-    #[pyo3(signature = (to, amount_zat, memo=None, allow_transparent=false, max_broadcast_delay=0.0))]
+    #[pyo3(signature = (to, amount_zat, memo=None, allow_transparent=false, max_broadcast_delay=0.0, allow_pool_crossing=false))]
+    #[allow(clippy::too_many_arguments)]
     fn send<'py>(
         &self,
         py: Python<'py>,
@@ -341,24 +342,107 @@ impl NativeWallet {
         memo: Option<String>,
         allow_transparent: bool,
         max_broadcast_delay: f64,
+        allow_pool_crossing: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let request = SendRequest::new(&self.inner.network, to, amount_zat, memo.as_deref(), allow_transparent)?;
-        self.send_request(py, request, max_broadcast_delay)
+        let mut request = SendRequest::new(&self.inner.network, to, amount_zat, memo.as_deref(), allow_transparent)?;
+        request.allow_pool_crossing = allow_pool_crossing;
+        self.send_request(py, Plan::Request(request), max_broadcast_delay)
     }
 
     /// Pays several recipients in one transaction: cheaper than separate sends, and an
     /// observer sees one transaction instead of several sent together. Each payment is
     /// `(address, amount_zat, memo)`.
-    #[pyo3(signature = (payments, allow_transparent=false, max_broadcast_delay=0.0))]
+    #[pyo3(signature = (payments, allow_transparent=false, max_broadcast_delay=0.0, allow_pool_crossing=false))]
     fn send_many<'py>(
         &self,
         py: Python<'py>,
         payments: Vec<(String, u64, Option<String>)>,
         allow_transparent: bool,
         max_broadcast_delay: f64,
+        allow_pool_crossing: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let request = SendRequest::many(&self.inner.network, &payments, allow_transparent)?;
-        self.send_request(py, request, max_broadcast_delay)
+        let mut request = SendRequest::many(&self.inner.network, &payments, allow_transparent)?;
+        request.allow_pool_crossing = allow_pool_crossing;
+        self.send_request(py, Plan::Request(request), max_broadcast_delay)
+    }
+
+    /// Parses a ZIP 321 payment request for display. Local only.
+    fn parse_request(&self, uri: &str) -> PyResult<send::PaymentRequest> {
+        send::PaymentRequest::of(&self.inner.network, uri)
+    }
+
+    /// Pays a ZIP 321 payment request, refusing it whole if it asks for more than `max_zat`.
+    #[pyo3(signature = (uri, max_zat, allow_transparent=false, allow_pool_crossing=false, max_broadcast_delay=0.0))]
+    fn pay<'py>(
+        &self,
+        py: Python<'py>,
+        uri: &str,
+        max_zat: u64,
+        allow_transparent: bool,
+        allow_pool_crossing: bool,
+        max_broadcast_delay: f64,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let mut request = SendRequest::from_uri(&self.inner.network, uri, allow_transparent, max_zat)?;
+        request.allow_pool_crossing = allow_pool_crossing;
+        self.send_request(py, Plan::Request(request), max_broadcast_delay)
+    }
+
+    /// Plans a payment without building or sending it: its fee, the notes it spends, its
+    /// change, and any value it would make public by crossing pools. Local only.
+    #[pyo3(signature = (payments, allow_transparent=false, allow_pool_crossing=false))]
+    fn propose(
+        &self,
+        py: Python<'_>,
+        payments: Vec<(String, u64, Option<String>)>,
+        allow_transparent: bool,
+        allow_pool_crossing: bool,
+    ) -> PyResult<send::PyProposal> {
+        let mut request = SendRequest::many(&self.inner.network, &payments, allow_transparent)?;
+        request.allow_pool_crossing = allow_pool_crossing;
+        let inner = Arc::clone(&self.inner);
+        py.detach(move || {
+            let mut db = inner.db.blocking_lock();
+            send::plan(&mut db, &inner.network, &inner.path, request)
+        })
+    }
+
+    /// Plans sending everything spendable to `to`; see `send::plan_sweep`. Local only.
+    #[pyo3(signature = (to, memo=None, everything=false, allow_transparent=false, allow_pool_crossing=false))]
+    fn propose_sweep(
+        &self,
+        py: Python<'_>,
+        to: String,
+        memo: Option<String>,
+        everything: bool,
+        allow_transparent: bool,
+        allow_pool_crossing: bool,
+    ) -> PyResult<send::PyProposal> {
+        let inner = Arc::clone(&self.inner);
+        py.detach(move || {
+            let mut db = inner.db.blocking_lock();
+            send::plan_sweep(
+                &mut db,
+                &inner.network,
+                &inner.path,
+                &to,
+                memo.as_deref(),
+                everything,
+                allow_transparent,
+                allow_pool_crossing,
+            )
+        })
+    }
+
+    /// Builds, signs and broadcasts exactly the transaction `proposal` describes. Fails,
+    /// building nothing, if the wallet spent or lost any of its notes in the meantime.
+    #[pyo3(signature = (proposal, max_broadcast_delay=0.0))]
+    fn send_proposal<'py>(
+        &self,
+        py: Python<'py>,
+        proposal: Py<send::PyProposal>,
+        max_broadcast_delay: f64,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        self.send_request(py, Plan::Planned(proposal), max_broadcast_delay)
     }
 
     /// The shielded address at a specific diversifier index. Invoices use indices from their
@@ -385,9 +469,22 @@ impl NativeWallet {
         py.detach(move || received::list(&path, since))
     }
 
+    /// Transactions first seen at or after `since`, newest first. Local only.
+    #[pyo3(signature = (since=0))]
+    fn transactions(&self, py: Python<'_>, since: u32) -> PyResult<Vec<history::Transaction>> {
+        let path = self.inner.path.clone();
+        py.detach(move || history::list(&path, since, None))
+    }
+
+    /// One transaction by txid, or None if the wallet has no record of it. Local only.
+    fn transaction(&self, py: Python<'_>, txid: String) -> PyResult<Option<history::Transaction>> {
+        let path = self.inner.path.clone();
+        py.detach(move || Ok(history::list(&path, 0, Some(&txid))?.into_iter().next()))
+    }
+
     /// Builds and proves an unsigned transaction (PCZT) for a cold signer. Needs no
     /// spending key, so it works on a watch-only wallet.
-    #[pyo3(signature = (to, amount_zat, memo=None, allow_transparent=false))]
+    #[pyo3(signature = (to, amount_zat, memo=None, allow_transparent=false, allow_pool_crossing=false))]
     fn propose_cold(
         &self,
         py: Python<'_>,
@@ -395,20 +492,24 @@ impl NativeWallet {
         amount_zat: u64,
         memo: Option<String>,
         allow_transparent: bool,
+        allow_pool_crossing: bool,
     ) -> PyResult<Vec<u8>> {
-        let request = SendRequest::new(&self.inner.network, to, amount_zat, memo.as_deref(), allow_transparent)?;
+        let mut request = SendRequest::new(&self.inner.network, to, amount_zat, memo.as_deref(), allow_transparent)?;
+        request.allow_pool_crossing = allow_pool_crossing;
         self.propose_request(py, request)
     }
 
     /// `propose_cold` for several recipients in one transaction.
-    #[pyo3(signature = (payments, allow_transparent=false))]
+    #[pyo3(signature = (payments, allow_transparent=false, allow_pool_crossing=false))]
     fn propose_cold_many(
         &self,
         py: Python<'_>,
         payments: Vec<(String, u64, Option<String>)>,
         allow_transparent: bool,
+        allow_pool_crossing: bool,
     ) -> PyResult<Vec<u8>> {
-        let request = SendRequest::many(&self.inner.network, &payments, allow_transparent)?;
+        let mut request = SendRequest::many(&self.inner.network, &payments, allow_transparent)?;
+        request.allow_pool_crossing = allow_pool_crossing;
         self.propose_request(py, request)
     }
 
@@ -459,6 +560,52 @@ impl NativeWallet {
                 .map(|m| u32::from(m.block_height()))
                 .unwrap_or(0);
             Ok(scanned)
+        })
+    }
+
+    /// Fetches the full transactions behind received notes whose memo is unknown, each one
+    /// hidden among `decoys` nearby transactions on a Tor circuit of its own, after a random
+    /// delay of up to `max_delay` seconds. Refused without Tor (unless the server is on
+    /// this machine). Transactions without enough decoys yet wait for later blocks.
+    #[pyo3(signature = (decoys=7, max_delay=10.0))]
+    fn fetch_memos<'py>(&self, py: Python<'py>, decoys: usize, max_delay: f64) -> PyResult<Bound<'py, PyAny>> {
+        if !(1..=31).contains(&decoys) {
+            return Err(pyo3::exceptions::PyValueError::new_err("decoys must be between 1 and 31"));
+        }
+        if !(0.0..=3600.0).contains(&max_delay) {
+            return Err(pyo3::exceptions::PyValueError::new_err("max_delay must be between 0 and 3600 seconds"));
+        }
+        if !self.inner.server.may_identify() {
+            return Err(PrivacyError::new_err(
+                "fetching memos asks the server for transactions by txid; it needs Tor \
+                 (open the wallet with tor=True) or a light server on this machine",
+            ));
+        }
+        let inner = Arc::clone(&self.inner);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let (batches, waiting) = tokio::task::block_in_place(|| memos::plan(&inner.path, decoys))?;
+            let mut report = memos::MemoReport { fetched: 0, waiting, unavailable: 0 };
+            let mut done = Vec::new();
+            for batch in batches {
+                if max_delay > 0.0 {
+                    tokio::time::sleep(send::random_delay(max_delay)).await;
+                }
+                let mut client = inner.server.connect(Purpose::MemoFetch).await?;
+                let fetched = memos::fetch(&mut client, &batch).await?;
+                let mut db = inner.db.lock().await;
+                let found = tokio::task::block_in_place(|| memos::store(&mut db, &inner.network, &batch, fetched))?;
+                drop(db);
+                if found {
+                    report.fetched += 1;
+                } else {
+                    report.unavailable += 1;
+                }
+                done.push(batch.real);
+            }
+            if !done.is_empty() {
+                memos::forget(&inner.path, &done)?;
+            }
+            Ok(report)
         })
     }
 
@@ -530,11 +677,17 @@ impl NativeWallet {
     }
 }
 
+/// What `send_request` builds: a fresh payment, or one planned earlier with `propose`.
+enum Plan {
+    Request(SendRequest),
+    Planned(Py<send::PyProposal>),
+}
+
 impl NativeWallet {
     fn send_request<'py>(
         &self,
         py: Python<'py>,
-        request: SendRequest,
+        plan: Plan,
         max_broadcast_delay: f64,
     ) -> PyResult<Bound<'py, PyAny>> {
         if !(0.0..=3600.0).contains(&max_broadcast_delay) {
@@ -554,8 +707,10 @@ impl NativeWallet {
             let mut client = inner.server.connect(Purpose::Broadcast).await?;
             let mut db = inner.db.lock().await;
             let usk = inner.usk.as_ref().expect("checked above");
-            let (txid, raw) =
-                tokio::task::block_in_place(|| send::build(&mut db, &inner.network, usk, request))?;
+            let (txid, raw) = tokio::task::block_in_place(|| match plan {
+                Plan::Request(request) => send::build(&mut db, &inner.network, usk, request),
+                Plan::Planned(planned) => send::build_planned(&mut db, &inner.network, usk, &inner.path, planned.get()),
+            })?;
             drop(db);
             if max_broadcast_delay > 0.0 {
                 tokio::time::sleep(send::random_delay(max_broadcast_delay)).await;
