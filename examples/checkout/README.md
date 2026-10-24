@@ -18,8 +18,10 @@ python -m zecpy.cold sign    ◄──────  refunds / payouts as PCZTs (
 pip install -e '.[examples]'
 devnet/up.sh "$(cat ~/.zecpy-dev/wallets/miner.addr)"
 
-# On the "cold" side (here, the same machine): make a seed and export its watch bundle.
-python -m zecpy.cold --network regtest --regtest-heights heights.json bundle > bundle.json
+# On the cold machine: generate a seed offline. The 24 words go to stderr (write them down);
+# the watch bundle, which cannot spend, goes to bundle.json for the server.
+echo '{"overwinter":1,"sapling":1,"blossom":1,"heartwood":1,"canopy":1,"nu5":1,"nu6":1,"nu6_1":1,"nu6_2":1,"nu6_3":1}' > heights.json
+python -m zecpy.cold --network regtest --regtest-heights heights.json new > bundle.json
 
 ZECPY_WALLET=./checkout-wallet ZECPY_WATCH_BUNDLE=bundle.json \
 ZECPY_SERVER=http://127.0.0.1:19067 ZECPY_REGTEST_HEIGHTS=heights.json \

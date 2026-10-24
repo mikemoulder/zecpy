@@ -62,6 +62,16 @@ class ColdSigner:
         heights = dict(regtest_heights) if regtest_heights is not None else None
         self._native = _NativeSigner(phrase, network, heights, account)
 
+    @classmethod
+    def generate(
+        cls, *, network: str, account: int = 0, regtest_heights: Mapping[str, int] | None = None
+    ) -> tuple[ColdSigner, Mnemonic]:
+        """Creates a signer with a fresh 24-word seed, entirely offline. Write the mnemonic
+        down: it is the only way to recover the funds."""
+        mnemonic = Mnemonic(_NativeSigner.generate_mnemonic())
+        signer = cls(mnemonic, network=network, account=account, regtest_heights=regtest_heights)
+        return signer, mnemonic
+
     def watch_bundle(self) -> WatchBundle:
         raw = self._native.watch_bundle()
         return WatchBundle(raw["network"], raw["ufvk"], raw["seed_fingerprint"], int(raw["account"]))
@@ -106,6 +116,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--account", type=int, default=0)
     parser.add_argument("--regtest-heights", help="JSON file of activation heights (regtest only)")
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("new", help="generate a seed offline; print its mnemonic and watch bundle")
     sub.add_parser("bundle", help="print the watch bundle for the hot wallet")
     p_inspect = sub.add_parser("inspect", help="describe an unsigned PCZT")
     p_inspect.add_argument("pczt", type=Path)
@@ -116,6 +127,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     heights = json.loads(Path(args.regtest_heights).read_text()) if args.regtest_heights else None
+    if args.command == "new":
+        signer, mnemonic = ColdSigner.generate(network=args.network, account=args.account, regtest_heights=heights)
+        print("Write these 24 words down and keep them offline. They control the funds.", file=sys.stderr)
+        print(mnemonic.reveal(), file=sys.stderr)
+        print(signer.watch_bundle().to_json())
+        return 0
     signer = ColdSigner(_read_mnemonic(), network=args.network, account=args.account, regtest_heights=heights)
 
     if args.command == "bundle":

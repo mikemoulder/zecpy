@@ -166,6 +166,12 @@ impl ColdSigner {
         Ok(ColdSigner { network, usk, seed_fingerprint, account })
     }
 
+    /// A new random 24-word mnemonic, generated locally with no network access.
+    #[staticmethod]
+    fn generate_mnemonic() -> String {
+        Mnemonic::<English>::generate(bip0039::Count::Words24).phrase().to_string()
+    }
+
     /// What a hot wallet needs to watch this account and build transactions for it: the
     /// Unified Full Viewing Key, the seed fingerprint and the account index. None of it can
     /// spend. The viewing key does reveal the account's history, so treat it as confidential.
