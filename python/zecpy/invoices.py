@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS payment (
 """
 
 PaymentState = Literal["detected", "confirmed", "reverted"]
+InvoiceState = Literal["unpaid", "pending", "partial", "paid"]
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,16 @@ class PaymentEvent:
     @property
     def invoice_settled(self) -> bool:
         return self.invoice_paid_zat >= self.invoice.amount_zat
+
+
+@dataclass(frozen=True)
+class InvoiceStatus:
+    invoice: Invoice
+    #: unpaid: nothing seen. pending: payment seen in a block but not confirmed enough.
+    #: partial: confirmed value below the amount. paid: confirmed value covers the amount.
+    state: InvoiceState
+    confirmed_zat: int
+    pending_zat: int
 
 
 class Invoices:
@@ -131,6 +142,26 @@ class Invoices:
             (invoice.id,),
         ).fetchone()
         return int(total)
+
+    def status(self, invoice: Invoice) -> InvoiceStatus:
+        """Where an invoice stands, from the payment events recorded so far."""
+        rows = dict(
+            self._db.execute(
+                "SELECT state, COALESCE(SUM(value_zat), 0) FROM payment"
+                " WHERE invoice_id = ? AND state IN ('confirmed', 'detected') GROUP BY state",
+                (invoice.id,),
+            ).fetchall()
+        )
+        confirmed, pending = int(rows.get("confirmed", 0)), int(rows.get("detected", 0))
+        if confirmed >= invoice.amount_zat:
+            state: InvoiceState = "paid"
+        elif confirmed:
+            state = "partial"
+        elif pending:
+            state = "pending"
+        else:
+            state = "unpaid"
+        return InvoiceStatus(invoice, state, confirmed, pending)
 
     def poll(self, confirmations: int = 3) -> list[PaymentEvent]:
         """Compares what the wallet has scanned with the events already emitted, records

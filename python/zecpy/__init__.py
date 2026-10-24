@@ -2,13 +2,14 @@
 
 from ._native import Balance, NetworkError, PrivacyError, WalletError, ZecPyError
 from .cold import ColdSigner, WatchBundle
-from .invoices import Invoice, Invoices, PaymentEvent
+from .invoices import Invoice, Invoices, InvoiceStatus, PaymentEvent
 from .wallet import Mnemonic, Wallet
 
 __all__ = [
     "Balance",
     "ColdSigner",
     "Invoice",
+    "InvoiceStatus",
     "Invoices",
     "Mnemonic",
     "NetworkError",

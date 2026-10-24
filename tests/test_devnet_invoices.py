@@ -32,9 +32,13 @@ async def test_payment_is_matched_to_its_invoice_without_a_memo(merchant, devnet
     assert not events[0].invoice_settled
     assert merchant.invoices.poll(confirmations=3) == [], "no duplicate events"
 
+    assert merchant.invoices.status(paid).state == "pending"
+    assert merchant.invoices.status(unpaid).state == "unpaid"
+
     devnet.mine(2)
     await merchant.sync()
     [confirmed] = merchant.invoices.poll(confirmations=3)
+    assert merchant.invoices.status(paid).state == "paid"
     assert confirmed.state == "confirmed"
     assert confirmed.confirmations >= 3
     assert confirmed.invoice_settled
@@ -57,10 +61,14 @@ async def test_restart_does_not_redeliver_payments(merchant, devnet):
 async def test_partial_payments_add_up(merchant, devnet):
     invoice = merchant.invoices.create(100_000, "order-91")
     devnet.pay(invoice.address, 60_000)
+    devnet.mine(3)
+    await merchant.sync()
+    merchant.invoices.poll()
+    assert merchant.invoices.status(invoice).state == "partial"
     devnet.pay(invoice.address, 40_000)
     devnet.mine(3)
     await merchant.sync()
-    events = merchant.invoices.poll()
-    assert sorted(e.value_zat for e in events) == [40_000, 60_000]
-    assert events[-1].invoice_settled
+    [event] = merchant.invoices.poll()
+    assert event.value_zat == 40_000 and event.invoice_settled
+    assert merchant.invoices.status(invoice).state == "paid"
     assert merchant.invoices.paid_zat(invoice) == 100_000
