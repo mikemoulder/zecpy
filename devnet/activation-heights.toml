@@ -1,0 +1,14 @@
+# Wallet-side view of the regtest chain's upgrades. Must match zebrad.toml.in.
+# Used by `zcash-devtool wallet init -n regtest --activation-heights` and by ZecPy's
+# regtest network parameters.
+overwinter = 1
+sapling = 1
+blossom = 1
+heartwood = 1
+canopy = 1
+nu5 = 1
+nu6 = 1
+nu6_1 = 1
+nu6_2 = 1
+nu6_3 = 1
+nu7 = "never"

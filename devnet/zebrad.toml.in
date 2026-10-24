@@ -1,0 +1,31 @@
+# Zebra on a private regtest chain. up.sh fills the @PLACEHOLDERS@.
+#
+# Consensus mirrors Mainnet: every upgrade through NU6.3 (Ironwood) is active from
+# block 1, NU7 is not. Keep these heights in sync with activation-heights.toml, which
+# tells the wallet side the same thing; a mismatch makes the node reject transactions.
+
+[network]
+network = "Regtest"
+listen_addr = "@P2P@"
+
+[network.testnet_parameters.activation_heights]
+Canopy = 1
+NU5 = 1
+NU6 = 1
+"NU6.1" = 1
+"NU6.2" = 1
+"NU6.3" = 1
+
+[mining]
+# Block rewards go to a shielded receiver, so test funds never sit in a transparent address.
+miner_address = "@MINER@"
+
+[rpc]
+listen_addr = "@RPC@"
+enable_cookie_auth = false
+
+[state]
+cache_dir = "@STATE@"
+
+[tracing]
+use_color = false
