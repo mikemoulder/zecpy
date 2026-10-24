@@ -105,18 +105,35 @@ class Wallet:
         return cls(native, wallet_dir)
 
     @classmethod
-    def open(cls, path: str | os.PathLike[str], *, server: str, tor: bool = True) -> Wallet:
-        """Opens an existing wallet directory."""
+    def open(
+        cls,
+        path: str | os.PathLike[str],
+        *,
+        server: str,
+        mnemonic: Mnemonic | str | None = None,
+        tor: bool = True,
+    ) -> Wallet:
+        """Opens an existing wallet directory.
+
+        Without the mnemonic the wallet is watch-only: it syncs, reports balances and derives
+        addresses, but cannot send. The mnemonic is checked against the wallet's keys.
+        """
         wallet_dir = Path(path)
         config = _Config.load(wallet_dir)
+        phrase = mnemonic.reveal() if isinstance(mnemonic, Mnemonic) else mnemonic
         native = NativeWallet.open(
-            str(wallet_dir / _DB), config.network, config.heights, server, tor
+            str(wallet_dir / _DB), config.network, config.heights, server, tor, phrase
         )
         return cls(native, wallet_dir)
 
     @property
     def network(self) -> str:
         return self._native.network
+
+    @property
+    def can_send(self) -> bool:
+        """False for watch-only wallets."""
+        return self._native.can_send
 
     async def sync(self) -> int:
         """Scans the chain up to its tip. Returns the height the wallet is synced to."""
@@ -129,6 +146,23 @@ class Wallet:
     def address(self) -> str:
         """A fresh Unified Address with shielded receivers only."""
         return self._native.address()
+
+    async def send(
+        self,
+        to: str,
+        amount_zat: int,
+        memo: str | None = None,
+        *,
+        allow_transparent: bool = False,
+    ) -> str:
+        """Pays ``amount_zat`` zatoshis to ``to`` and returns the txid.
+
+        Spends shielded funds only. A transparent-only recipient raises ``PrivacyError``
+        unless ``allow_transparent`` is set, because the payment would be public on chain.
+        The transaction is proved and signed locally; only the finished transaction is sent
+        to the server.
+        """
+        return await self._native.send(to, amount_zat, memo, allow_transparent)
 
     def __repr__(self) -> str:
         return f"Wallet(path={str(self.path)!r}, network={self.network!r})"

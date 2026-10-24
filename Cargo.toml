@@ -22,8 +22,13 @@ pyo3-async-runtimes = { version = "=0.30.0", features = ["tokio-runtime"] }
 zcash_client_backend = { version = "=0.25.0", features = ["lightwalletd-tonic-tls-webpki-roots", "orchard", "sync"] }
 zcash_client_sqlite = { version = "=0.23.0", features = ["orchard"] }
 zcash_keys = { version = "=0.17.0", features = ["orchard", "sapling"] }
+zcash_address = "=0.14.0"
 zcash_primitives = "=0.31.0"
+# Sapling proving parameters embedded in the binary: no download at runtime.
+zcash_proofs = { version = "=0.31.0", features = ["bundled-prover"] }
 zcash_protocol = { version = "=0.11.0", features = ["local-consensus"] }
+zip32 = "=0.3.0"
+zip321 = "=0.10.0"
 
 # Async + gRPC (versions follow zcash_client_backend's)
 async-trait = "0.1"

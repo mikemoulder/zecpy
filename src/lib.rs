@@ -5,6 +5,8 @@ mod cache;
 mod error;
 mod net;
 mod network;
+mod received;
+mod send;
 mod wallet;
 
 use pyo3::prelude::*;
@@ -13,6 +15,7 @@ use pyo3::prelude::*;
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<wallet::NativeWallet>()?;
     m.add_class::<wallet::Balance>()?;
+    m.add_class::<received::ReceivedOutput>()?;
     error::register(m)?;
     Ok(())
 }
