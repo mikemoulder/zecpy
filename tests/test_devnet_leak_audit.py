@@ -11,7 +11,7 @@ import asyncio
 
 import pytest
 
-from tests.conftest import DEV, REPO
+from tools.devnet import DEV, REPO
 from tools.leak_audit import AuditProxy, Label
 from zecpy import Wallet
 
