@@ -469,10 +469,27 @@ impl NativeWallet {
         py.detach(move || {
             let db = inner.db.blocking_lock();
             let account = first_account(&db)?;
-            let summary = db
+            let Some(summary) = db
                 .get_wallet_summary(ConfirmationsPolicy::default())
                 .map_err(error::wallet("cannot read balance"))?
-                .ok_or_else(|| WalletError::new_err("wallet has not synced yet"))?;
+            else {
+                // Nothing scanned yet: a new wallet holds nothing, which is not an error.
+                let chain_tip = db
+                    .chain_height()
+                    .map_err(error::wallet("cannot read chain height"))?
+                    .map(u32::from)
+                    .unwrap_or(0);
+                return Ok(Balance {
+                    total: 0,
+                    spendable: 0,
+                    pending: 0,
+                    sapling: 0,
+                    orchard: 0,
+                    ironwood: 0,
+                    chain_tip,
+                    scanned_height: 0,
+                });
+            };
             let bal = summary
                 .account_balances()
                 .get(&account)

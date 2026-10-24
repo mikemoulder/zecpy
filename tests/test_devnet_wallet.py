@@ -52,3 +52,12 @@ async def test_each_address_is_fresh(tmp_path, devnet):
         tmp_path / "w", network="regtest", server=devnet.server, regtest_heights=devnet.heights
     )
     assert len({wallet.address() for _ in range(5)}) == 5
+
+
+async def test_new_wallet_reports_zero_balance_before_first_sync(tmp_path, devnet):
+    wallet, _ = await Wallet.create(
+        tmp_path / "w", network="regtest", server=devnet.server, regtest_heights=devnet.heights
+    )
+    balance = wallet.balance()
+    assert (balance.total, balance.spendable, balance.scanned_height) == (0, 0, 0)
+    assert balance.chain_tip > 0
