@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Mapping
 
 from ._native import Balance, NativeWallet
+from .invoices import Invoices
 
 _DB = "wallet.db"
 _CONFIG = "zecpy.json"
@@ -58,6 +59,14 @@ class Wallet:
     def __init__(self, native: NativeWallet, path: Path) -> None:
         self._native = native
         self.path = path
+        self._invoices: Invoices | None = None
+
+    @property
+    def invoices(self) -> Invoices:
+        """Invoices with their own shielded addresses, and exactly-once payment events."""
+        if self._invoices is None:
+            self._invoices = Invoices(self)
+        return self._invoices
 
     @classmethod
     async def create(

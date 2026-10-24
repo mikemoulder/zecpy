@@ -15,6 +15,14 @@ class Balance:
     chain_tip: int
     scanned_height: int
 
+class ReceivedOutput:
+    txid: str
+    pool: str
+    output_index: int
+    value: int
+    mined_height: int | None
+    diversifier_index: int | None
+
 class NativeWallet:
     @staticmethod
     def create(
@@ -43,5 +51,7 @@ class NativeWallet:
     def sync(self) -> Awaitable[int]: ...
     def balance(self) -> Balance: ...
     def address(self) -> str: ...
+    def address_at(self, index: int) -> str: ...
+    def received(self, since: int = 0) -> list[ReceivedOutput]: ...
     @property
     def network(self) -> str: ...
