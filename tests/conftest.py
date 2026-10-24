@@ -52,6 +52,29 @@ class Devnet:
             _rpc("generate", [1])
         return self.height()
 
+    def invalidate(self, height: int) -> None:
+        """Marks the block at `height` invalid, rewinding the node's chain to just below it.
+        Mining afterwards builds a competing branch: a reorg for every wallet that saw it."""
+        block_hash = _rpc("getblockhash", [height])
+        _rpc("invalidateblock", [block_hash])
+
+    def mempool(self) -> list[str]:
+        return list(_rpc("getrawmempool"))
+
+    def rebroadcast(self, txid: str) -> None:
+        """Resubmits a transaction the miner wallet created, as a wallet would after a reorg."""
+        import sqlite3
+
+        db = sqlite3.connect(f"file:{DEV / 'wallets' / 'miner' / 'data.sqlite'}?mode=ro", uri=True)
+        row = db.execute(
+            "SELECT raw FROM transactions WHERE txid = ?", (bytes.fromhex(txid)[::-1],)
+        ).fetchone()
+        db.close()
+        if row is None or row[0] is None:
+            raise RuntimeError(f"miner wallet has no raw transaction {txid}")
+        if txid not in self.mempool():
+            _rpc("sendrawtransaction", [row[0].hex()])
+
     def devtool(self, *args: str) -> str:
         """Runs zcash-devtool against the miner wallet, which funds tests."""
         cmd = [str(DEV / "bin" / "zcash-devtool"), "wallet", "-w", "miner", *args]
