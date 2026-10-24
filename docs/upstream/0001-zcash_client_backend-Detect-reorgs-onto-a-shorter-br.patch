@@ -1,0 +1,176 @@
+From d7859e94252418a0fe0843c4961224d01a724a84 Mon Sep 17 00:00:00 2001
+From: xerodahdev <xero.dev.ai@gmail.com>
+Date: Sat, 24 Oct 2026 20:50:42 +0200
+Subject: [PATCH] zcash_client_backend: Detect reorgs onto a shorter branch and
+ align sync batches
+
+sync::run passed the server's tip height straight to update_chain_tip. When a
+reorg moved the best chain onto a branch that is not yet longer than what the
+wallet has scanned, no new scan range appeared and the wallet kept reporting
+confirmations from the abandoned branch. Compare the block hash at the reported
+tip with the wallet's and rewind when they differ.
+
+Scan ranges were split at start + batch_size, an offset from where the previous
+sync stopped, so every per-batch GetTreeState request revealed that height.
+Split at absolute multiples of batch_size instead.
+---
+ zcash_client_backend/CHANGELOG.md | 10 +++++
+ zcash_client_backend/src/sync.rs  | 75 +++++++++++++++++++++++++++----
+ 2 files changed, 77 insertions(+), 8 deletions(-)
+
+diff --git a/zcash_client_backend/CHANGELOG.md b/zcash_client_backend/CHANGELOG.md
+index 7779b5c..f41199e 100644
+--- a/zcash_client_backend/CHANGELOG.md
++++ b/zcash_client_backend/CHANGELOG.md
+@@ -10,6 +10,16 @@ workspace.
+ 
+ ## [Unreleased]
+ 
++### Fixed
++- `zcash_client_backend::sync::run` now detects a chain reorganization onto a branch that
++  is not yet longer than the wallet's scanned history, by comparing the block hash at the
++  reported tip. Previously the wallet kept its view of the abandoned branch, reporting
++  confirmations for transactions no longer in the best chain, until the new branch
++  outgrew the old one.
++- `zcash_client_backend::sync::run` splits scan ranges into batches at absolute multiples
++  of `batch_size`. Batch boundaries were offsets from the height where the previous sync
++  stopped, so each per-batch `GetTreeState` request revealed that height to the server.
++
+ ## [0.25.0] - 2026-10-21
+ 
+ ### Added
+diff --git a/zcash_client_backend/src/sync.rs b/zcash_client_backend/src/sync.rs
+index e0ec8d6..b9323e9 100644
+--- a/zcash_client_backend/src/sync.rs
++++ b/zcash_client_backend/src/sync.rs
+@@ -33,7 +33,7 @@ use {
+         codegen::{Body, Bytes, StdError},
+     },
+     tracing::{debug, info},
+-    zcash_primitives::merkle_tree::HashSer,
++    zcash_primitives::{block::BlockHash, merkle_tree::HashSer},
+     zcash_protocol::consensus::{BlockHeight, Parameters},
+ };
+ 
+@@ -108,7 +108,10 @@ where
+ {
+     // 3) Download chain tip metadata from lightwalletd
+     // 4) Notify the wallet of the updated chain tip.
+-    update_chain_tip(client, db_data).await?;
++    if let Some(rewound) = update_chain_tip(client, db_data).await? {
++        db_cache.truncate(rewound).await.map_err(Error::Cache)?;
++        return Ok(true);
++    }
+ 
+     // Refresh UTXOs for the accounts in the wallet. We do this before we perform
+     // any shielded scanning, to ensure that we discover any UTXOs between the old
+@@ -184,7 +187,9 @@ where
+         (0..).scan(r, |acc, _| {
+             if acc.is_empty() {
+                 None
+-            } else if let Some((cur, next)) = acc.split_at(acc.block_range().start + batch_size) {
++            } else if let Some((cur, next)) =
++                acc.split_at(next_batch_boundary(acc.block_range().start, batch_size))
++            {
+                 *acc = next;
+                 Some(cur)
+             } else {
+@@ -298,11 +303,28 @@ where
+     Ok(())
+ }
+ 
++/// The first height after `start` that is a multiple of `batch_size`.
++///
++/// Splitting scan ranges at absolute multiples, rather than at `start + batch_size`, makes the
++/// tree-state request for every batch after the first one that any wallet crossing that
++/// height would also make. Relative boundaries are offsets from where the wallet's previous
++/// sync stopped, so each `GetTreeState` request would reveal that height to the server.
++#[cfg(feature = "sync")]
++fn next_batch_boundary(start: BlockHeight, batch_size: u32) -> BlockHeight {
++    BlockHeight::from_u32((u32::from(start) / batch_size + 1) * batch_size)
++}
++
++/// Updates the wallet's view of the chain tip.
++///
++/// Returns the height the wallet was rewound to if the server's tip is on a different branch
++/// at a height the wallet has already scanned. Such a reorg produces no new scan range (the
++/// reported tip is not above what was scanned), so without this check the wallet would keep
++/// its view of the abandoned branch until the new branch outgrew it.
+ #[cfg(feature = "sync")]
+ async fn update_chain_tip<ChT, DbT, CaErr, TrErr>(
+     client: &mut CompactTxStreamerClient<ChT>,
+     db_data: &mut DbT,
+-) -> Result<(), Error<CaErr, <DbT as WalletRead>::Error, TrErr>>
++) -> Result<Option<BlockHeight>, Error<CaErr, <DbT as WalletRead>::Error, TrErr>>
+ where
+     ChT: GrpcService<TonicBody>,
+     ChT::Error: Into<StdError>,
+@@ -311,20 +333,42 @@ where
+     DbT: WalletWrite,
+     <DbT as WalletRead>::Error: std::error::Error + Send + Sync + 'static,
+ {
+-    let tip_height: BlockHeight = client
++    let latest = client
+         .get_latest_block(service::ChainSpec::default())
+         .await?
+-        .get_ref()
++        .into_inner();
++    let tip_height: BlockHeight = latest
+         .height
+         .try_into()
+         .map_err(|_| Error::MisbehavingServer)?;
+-
+     info!("Latest block height is {}", tip_height);
++
++    // A tip at or below what we already scanned is either a reorg onto a branch that is not
++    // (yet) longer, or a server that is behind us. Only the block hash tells them apart.
++    if let Some(max_scanned) = db_data.block_max_scanned().map_err(Error::Wallet)? {
++        if tip_height <= max_scanned.block_height() {
++            let reported =
++                BlockHash::try_from_slice(&latest.hash).ok_or(Error::MisbehavingServer)?;
++            let ours = db_data.get_block_hash(tip_height).map_err(Error::Wallet)?;
++            if ours.is_some_and(|ours| ours != reported) {
++                let rewind_height = tip_height.saturating_sub(10);
++                info!(
++                    "Chain tip {} is on a different branch than our scanned history, rewinding to {}",
++                    tip_height, rewind_height,
++                );
++                let rewound = db_data
++                    .truncate_to_height(rewind_height)
++                    .map_err(Error::Wallet)?;
++                return Ok(Some(rewound));
++            }
++        }
++    }
++
+     db_data
+         .update_chain_tip(tip_height)
+         .map_err(Error::Wallet)?;
+ 
+-    Ok(())
++    Ok(None)
+ }
+ 
+ #[cfg(feature = "sync")]
+@@ -697,3 +741,18 @@ mod tests {
+         assert_eq!(request_count.load(Ordering::Relaxed), 3);
+     }
+ }
++
++#[cfg(all(test, feature = "sync"))]
++mod batch_boundary_tests {
++    use zcash_protocol::consensus::BlockHeight;
++
++    use super::next_batch_boundary;
++
++    #[test]
++    fn batch_boundaries_are_absolute() {
++        let h = BlockHeight::from_u32;
++        assert_eq!(next_batch_boundary(h(1_335), 1_000), h(2_000));
++        assert_eq!(next_batch_boundary(h(2_000), 1_000), h(3_000));
++        assert_eq!(next_batch_boundary(h(2_999), 1_000), h(3_000));
++    }
++}
+-- 
+2.43.0
+

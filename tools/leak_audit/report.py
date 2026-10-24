@@ -166,7 +166,40 @@ class Devtool(Driver):
                                "--value", str(zatoshis), "-s", self.server.removeprefix("http://")))
 
 
-DRIVERS: list[type[Driver]] = [ZecPy, Devtool]
+class Zingo(Driver):
+    name = "zingo-cli"
+    version = (
+        "zingolib 625f617 (pepper-sync), built with its `nakednet-test-mode` measurement feature: "
+        "by default zingo-cli routes sends over the Nym mixnet, which a loopback proxy cannot observe"
+    )
+
+    def _cmd(self, *args: str, sync: bool) -> list[str]:
+        mode = ["--waitsync"] if sync else ["--nosync"]
+        return [str(DEV / "bin" / "zingo-cli-measure"), "--chain", "regtest", "--server", self.server,
+                "--data-dir", str(self.workdir / "w"), *mode, *args]
+
+    async def create(self) -> None:
+        (self.workdir / "w").mkdir()
+        await _exec(*self._cmd("addresses", sync=False))
+
+    async def sync(self) -> None:
+        await _exec(*self._cmd("height", sync=True))
+
+    async def restart(self) -> None:
+        pass  # every zingo-cli command is a fresh process
+
+    async def address(self) -> str:
+        out = await _exec(*self._cmd("addresses", sync=False))
+        for word in out.replace('"', " ").replace(",", " ").split():
+            if word.startswith("uregtest1"):
+                return word
+        raise RuntimeError(f"no regtest address in zingo-cli output: {out[-300:]}")
+
+    async def send(self, to: str, zatoshis: int) -> None:
+        await _exec(*self._cmd("quicksend", to, str(zatoshis), sync=False))
+
+
+DRIVERS: list[type[Driver]] = [ZecPy, Devtool, Zingo]
 
 
 # --- report --------------------------------------------------------------------------
@@ -236,6 +269,10 @@ def write_report(runs: list[Run]) -> Path:
 
 
 async def main() -> None:
+    import sys
+
+    only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
+    drivers = [d for d in DRIVERS if only is None or d.name == only]
     devnet = Devnet(LWD, activation_heights())
     devnet.height()  # fails fast if devnet is down
     from zecpy import Wallet
@@ -246,11 +283,15 @@ async def main() -> None:
     )
     recipient = sink.address()
     runs = []
-    for driver in DRIVERS:
+    for driver in drivers:
         print(f"running {driver.name}...", flush=True)
         runs.append(await run_driver(driver, devnet, recipient))
         print("  " + ", ".join(f"{k}: {_cell(v)}" for k, v in runs[-1].records.items()), flush=True)
-    print(f"wrote {write_report(runs)}")
+    if only is None:
+        print(f"wrote {write_report(runs)}")
+    else:
+        for run in runs:
+            print("notes:", run.notes)
 
 
 if __name__ == "__main__":
