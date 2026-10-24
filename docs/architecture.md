@@ -100,29 +100,56 @@ payment   id, invoice_id, txid, pool, output_index, value_zat, height, status
           UNIQUE (txid, pool, output_index)   exactly-once delivery
 ```
 
+Files beside the wallet database: `chain_state.bin` (tree state at the last synced tip,
+so the next sync does not ask where it stopped), `memo_decoys.txt` (decoy candidates and
+pending memo fetches; as sensitive as the database) and `tor/` (arti state).
+
 `status` moves `detected → confirmed`, and back to `detected` (or removed) if a reorg drops
 the block.
 
 ## Python API
 
+As built (`python/zecpy/wallet.py`; types in `python/zecpy/_native.pyi`). Amounts are
+zatoshis. Methods marked local send nothing to the server.
+
 ```python
 class Wallet:
-    @classmethod
-    async def create(cls, path, *, network, server, tor=True) -> tuple["Wallet", Mnemonic]: ...
-    @classmethod
-    async def restore(cls, path, mnemonic, *, birthday, network, server, tor=True) -> "Wallet": ...
-    @classmethod
-    async def watch(cls, path, ufvk, *, birthday, network, server, tor=True) -> "Wallet": ...
-    @classmethod
-    def open(cls, path, *, server, tor=True) -> "Wallet": ...
+    # Lifecycle
+    @staticmethod
+    async def create(path, *, network, server, tor=True) -> tuple[Wallet, Mnemonic]: ...
+    @staticmethod
+    async def restore(path, mnemonic, *, network, server, birthday=None, tor=True) -> Wallet: ...
+    @staticmethod
+    async def watch(path, bundle, *, server, birthday=None, tor=True) -> Wallet: ...  # viewing key only
+    @staticmethod
+    def open(path, *, server, mnemonic=None, tor=True) -> Wallet: ...                 # no mnemonic: watch-only
 
-    async def sync(self, progress=None) -> SyncResult: ...
-    def balance(self) -> Balance: ...                     # per pool, spendable vs pending
-    def address(self) -> str: ...                         # fresh shielded UA, no transparent
-    def viewing_key(self) -> str: ...                     # UFVK for watch-only deployments
-    def invoice(self, amount_zat, reference) -> Invoice: ...
-    def payments(self, confirmations=3) -> AsyncIterator[Payment]: ...
-    async def send(self, to, amount_zat, memo=None, *, allow_transparent=False) -> str: ...
+    # Chain and state
+    async def sync(self) -> int: ...                       # height synced to
+    def balance(self) -> Balance: ...                      # local; per pool, spendable vs pending
+    def address(self) -> str: ...                          # local; fresh shielded UA
+    def transactions(self, since=0) -> list[Transaction]: ...   # local
+    def transaction(self, txid) -> Transaction | None: ...      # local
+    async def fetch_memos(self, *, decoys=7, max_delay=10.0) -> MemoReport: ...  # opt-in, Tor
+
+    # Paying
+    def propose(self, to, amount_zat, memo=None, **flags) -> Proposal: ...   # local
+    def propose_many(self, payments, **flags) -> Proposal: ...               # local, up to 50
+    def propose_sweep(self, to, memo=None, *, mode="spendable", **flags) -> Proposal: ...  # local
+    async def send_proposal(self, proposal, *, max_broadcast_delay=0.0) -> str: ...
+    async def send(self, to, amount_zat, memo=None, **flags) -> str: ...
+    async def send_many(self, payments, **flags) -> str: ...
+    def parse_request(self, uri) -> PaymentRequest: ...                       # local, ZIP-321
+    async def pay(self, uri, *, max_zat, **flags) -> str: ...
+
+    # Cold signing
+    def propose_cold(self, to, amount_zat, memo=None, **flags) -> bytes: ...  # unsigned PCZT
+    def propose_cold_many(self, payments, **flags) -> bytes: ...
+    async def broadcast_signed(self, signed_pczt, *, max_broadcast_delay=0.0) -> str: ...
+
+    invoices: Invoices    # create, get, by_reference, status, paid_zat, poll, watch
+
+# flags: allow_transparent=False, allow_pool_crossing=False (both refusals raise PrivacyError)
 ```
 
 ## Risks

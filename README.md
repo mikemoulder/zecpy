@@ -34,6 +34,15 @@ async for event in wallet.invoices.watch(confirmations=3):
   proves a PCZT; the offline `zecpy-cold` signer shows what will leave the wallet and signs.
 - **Tor by default**: every sync session and every broadcast on its own isolated circuit,
   retried on fresh circuits, never falling back to a direct connection.
+- **Fee preview**: `propose` shows the fee, the notes spent, the change and any value that
+  would become public by crossing pools; `send_proposal` sends exactly that transaction.
+  A crossing that publishes its amount raises `PrivacyError` unless allowed.
+- **Payment links for agents**: `pay(uri, max_zat=...)` pays a ZIP-321 request, refused
+  whole if it asks for more than the budget or names no amount.
+- **History and memos**: `transactions()` reads the local database only. Received memos are
+  opt-in (`fetch_memos`), since compact blocks do not carry them: each real fetch goes out
+  over Tor shuffled among 7 decoy transactions from nearby blocks.
+- **Sweep**: `propose_sweep` empties a wallet, fee included, with nothing left behind.
 
 ## How it works
 
@@ -81,14 +90,31 @@ testnet: `pytest -m network`.
 ## What is real, what is not
 
 - **Real, tested:** everything above, on a local regtest chain with real blocks, proofs and
-  reorgs (`invalidateblock`): 68 tests. A send takes about 11 s on a 4-core VPS; the fee is
+  reorgs (`invalidateblock`): 78 tests. A send takes about 11 s on a 4-core VPS; the fee is
   10,000 zatoshis.
 - **Real, public network:** wallet creation and sync over Tor against
   `testnet.zec.rocks`, passing 3 of 3 runs. No payment was sent on testnet: both public
   faucets were down during the build. No mainnet funds were moved.
-- **By design, not built:** transparent receiving and incoming memo reading (both need
-  requests that identify the wallet). The `pczt` dependency compiles librustzcash's
+- **Unit-tested only:** the pool-crossing refusal. The regtest chain activates Ironwood at
+  height 1, so it never holds Orchard notes and no real crossing can be built there; the
+  per-pool calculation is tested on constructed inputs, and the ZIP 318 canonical check is
+  librustzcash's own `Step::is_canonical_crossing`.
+- **By design, not built:** transparent receiving (it needs requests that identify the
+  wallet; see the table below). The `pczt` dependency compiles librustzcash's
   transparent code in; ZecPy never calls it, and the leak audit checks that on every run.
+
+## What ZecPy deliberately does not do
+
+Each of these is a request a light server could use to identify the wallet, or a feature
+whose privacy cost ZecPy will not hide behind a default.
+
+| Not done | Why | Where it lives instead |
+|---|---|---|
+| Transparent receiving and shielding | Needs `GetAddressUtxos`/`GetTaddressTxids` queries that name the wallet's addresses | zcash-devtool `wallet shield` |
+| Memo fetching by default | Every fetch names a txid; ZecPy makes it opt-in and hides it among decoys | `fetch_memos()` |
+| Mempool watching | Detection waits for the block; `GetMempoolTx` would send the txids the wallet knows | Compact blocks at the next block |
+| Status lookups for orphaned payments | `GetTransaction` by txid; an orphaned payment stays pending until re-mined | See the privacy model |
+| More than one account, multisig, hardware wallets | Out of scope for a backend SDK | zcash-devtool `zip48`, `pczt` |
 
 ## Limitations and next
 

@@ -54,10 +54,52 @@ one.
 | Transparent address queries (`GetAddressUtxos`, `GetTaddressTxids`) on every sync | Sent by librustzcash's `sync::run` when transparent support is built in | Never sent: ZecPy's own sync loop has no transparent queries, and the leak audit asserts their absence on every test run |
 | Exact birthday (`GetTreeState` at birthday - 1) | Sent at wallet creation | Birthday rounded down to a 10,000-block boundary |
 | Where the last sync stopped (`GetTreeState` at every batch start) | Sent on every incremental sync by librustzcash `sync::run`; links sessions | Own sync loop: the tip's tree state comes from `GetLatestTreeState` and is saved for the next sync; adjacent ranges merge; batches split only at multiples of 1,000 |
-| Memo and transaction-detail fetches (`GetTransaction` by txid) | Sent to read memos and fill in history | Never sent. Invoices match payments by receiving address, so memos are not needed |
+| Memo and transaction-detail fetches (`GetTransaction` by txid) | Sent for every received transaction, alone, to read memos and fill in history | Off by default: invoices match by address and history is local. Opt-in `fetch_memos` sends each real txid only among decoys, over Tor (see below) |
+| Pool crossings (Orchard notes paying an Ironwood receiver) | Built silently; the crossing amount is public in the bundles' value balances | `propose` reports `crossing_value`; sending refuses with `PrivacyError` unless `allow_pool_crossing=True`. ZIP 318 canonical migrations pass |
 | Payments to transparent addresses | Allowed | Refused with `PrivacyError` unless `allow_transparent=True` |
 | Network path linking sync and send | One connection, or one Tor circuit, for everything | Every sync session and every broadcast gets its own isolated Tor circuit; a failed circuit is retried on a fresh one, never directly |
 | Broadcast timing | Published the moment it is built | Optional `max_broadcast_delay`: published after a random delay from the system CSPRNG |
+
+## Memo fetching
+
+Compact blocks carry only the first 52 bytes of each note ciphertext, so a memo needs the
+full transaction, requested by txid. A server that sees one txid fetched soon after it was
+mined learns that a light wallet received in it. Tor hides which wallet, not which
+transaction. `fetch_memos` is therefore opt-in, and when used:
+
+1. **Only what is needed.** librustzcash queues every wallet transaction for retrieval, and
+   after decrypting one also queues the funding transactions of its transparent inputs.
+   ZecPy fetches only transactions holding a received shielded note whose memo is unknown;
+   fetching the others would tell the server about the sender's coins.
+2. **Never alone.** Each real txid is fetched with `k` decoys (default 7): other
+   non-coinbase transactions with shielded outputs, within 100 blocks, taken from compact
+   blocks the wallet already downloaded. A coinbase is excluded because a server would rule
+   it out as a payment at once.
+3. **No rank tell.** Decoys are a window of consecutive candidates in height order, offset
+   so the real transaction's rank inside the window is uniform. Choosing "the nearest k"
+   would put the real one at the median. A unit test checks the rank distribution over
+   5,000 draws.
+4. **Wait rather than go out bare.** A payment without `k` candidates yet stays pending
+   until later blocks supply them.
+5. **Separate circuit, random time.** Each batch uses its own isolated Tor circuit, after a
+   random delay of up to `max_delay` seconds (default 10), in shuffled order. Without Tor,
+   to a remote server, the call raises `PrivacyError`.
+
+What it does not hide: that some client fetched these `k + 1` transactions, and the rough
+height they share. The anonymity set is the decoys plus every other client of that server.
+`tests/test_devnet_memos.py` asserts through the audit proxy that sync sends no
+`GetTransaction` at all, that a fetch sends exactly `k + 1` distinct txids including the
+real one, and that no decoy is a coinbase.
+
+## Pool crossings
+
+Each shielded bundle's net value balance is public. When Orchard notes pay an Ironwood
+receiver, the Orchard bundle shows value leaving and the Ironwood bundle shows it arriving:
+the amount is on chain. `propose` computes the value entering each pool beyond what was
+spent from it and reports it as `crossing_value`. Sending refuses it unless the caller
+passes `allow_pool_crossing=True`, except for ZIP 318 canonical migration transfers (one
+canonical denomination, fixed shape and fee), which are built to be indistinguishable from
+each other.
 
 ## Cold signing
 
@@ -82,6 +124,8 @@ history to whoever holds it. It cannot spend, but it is confidential.
   default (arti, via `zcash_client_backend`'s `tor` feature), and `.onion` servers are
   supported. With `tor=False` the server sees the caller's IP; that is an explicit opt-out.
   Loopback servers are always direct.
+- **With `fetch_memos`: `k + 1` transactions near one height,** from a fresh Tor circuit.
+  See Memo fetching above.
 - **One exact-height tree-state request after a reorg.** When the chain reorganises, the
   wallet rewinds and must fetch the tree state at the rewind height. Reorgs are rare and
   the audit reports this request as identifying rather than hiding it.
