@@ -64,7 +64,7 @@ No cryptography is reimplemented. Details: [docs/architecture.md](docs/architect
 ## Quick start
 
 Needs Linux, Python 3.10+ and a Rust toolchain (tested with 1.99). Tested from a fresh
-clone with [uv](https://docs.astral.sh/uv/); the build took 11 minutes on a 4-core VPS,
+clone with uv; the build took 11 minutes on a 4-core VPS,
 plus the time to download the crates.
 
 ```bash
