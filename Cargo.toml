@@ -44,3 +44,11 @@ zeroize = "1"
 
 [profile.release]
 lto = "thin"
+
+# Halo 2 proving is ~50x slower unoptimized (a send took 121 s in a plain debug build).
+# Optimize every dependency even in dev builds; our own crate stays quick to recompile.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev]
+opt-level = 1
