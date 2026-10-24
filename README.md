@@ -1,7 +1,98 @@
 # ZecPy
 
-Shielded Zcash for Python: send and receive private ZEC from backends, bots and agents, built
-on librustzcash.
+**Shielded Zcash for Python backends, with privacy you can measure: across create, sync, receive, restart and send, ZecPy sends its light server zero identifying requests. Two reference wallets send 7 and 71.**
 
-Work in progress for ZECATHON (Core & Tooling). See `docs/architecture.md` for the design and
-`devnet/README.md` for the local test chain.
+[Privacy report](docs/privacy-report.md) · [Bugs found upstream](docs/upstream/README.md) · [Checkout API example](examples/checkout/README.md) · [Privacy model](docs/privacy-model.md)
+
+![Identifying requests seen by the light server, per wallet and scenario](assets/screenshots/privacy-report.svg)
+
+Built for ZECATHON (Core & Tooling) on librustzcash, Orchard and Ironwood, with Tor via arti.
+
+## The problem
+
+A Python developer who wants to accept ZEC today shells out to a CLI or runs a full wallet
+server, and the light wallet code they would build on asks its server questions that give
+the user away: which transparent addresses are theirs, which transactions are theirs, where
+their last sync stopped. "Shielded" on chain, identifiable at the server.
+
+## What ZecPy does
+
+```python
+wallet, mnemonic = await Wallet.create("./shop", network="test", server="https://testnet.zec.rocks:443")
+invoice = wallet.invoices.create(150_000, "order-77")   # its own shielded address + ZIP-321 URI
+async for event in wallet.invoices.watch(confirmations=3):
+    if event.state == "confirmed" and event.invoice_settled:
+        ship(event.invoice.reference)                    # exactly once, even across restarts
+```
+
+- **Invoices** with a fresh diversified address each: payments match during local trial
+  decryption, with no memo and no request to the server. Events are `detected`, `confirmed`
+  and `reverted` (a reorg removed the block), persisted so a restart never re-delivers.
+- **Sending**: `send` and `send_many` (up to 50 recipients, one transaction), proved and
+  signed locally. Transparent recipients raise `PrivacyError` unless explicitly allowed.
+- **Cold signing**: the server imports a viewing key only (`Wallet.watch`), builds and
+  proves a PCZT; the offline `zecpy-cold` signer shows what will leave the wallet and signs.
+- **Tor by default**: every sync session and every broadcast on its own isolated circuit,
+  retried on fresh circuits, never falling back to a direct connection.
+
+## How it works
+
+```text
+python/zecpy/     Wallet, invoices, cold signer, async API            (Python)
+src/              PyO3 core: sync loop, send, PCZT, Tor connections    (Rust)
+                  └─ librustzcash: zcash_client_backend 0.25, zcash_client_sqlite 0.23,
+                     orchard 0.16, pczt 0.10, zcash_proofs (bundled Sapling params)
+tools/leak_audit/ gRPC proxy that decodes and classifies every request a wallet makes
+devnet/           local regtest chain: zebrad 7.0.0 + lightwalletd 0.6.0, Ironwood active
+```
+
+No cryptography is reimplemented. Details: [docs/architecture.md](docs/architecture.md).
+
+## Technical highlights
+
+- **A leak in librustzcash's own sync, found by measuring.** `sync::run` asks for the tree
+  state where the previous sync stopped, linking sessions. ZecPy's sync loop
+  ([src/sync.rs](src/sync.rs)) takes the tip's state from `GetLatestTreeState`, saves it, and
+  splits batches only at absolute multiples of 1,000.
+- **A reorg bug it also shares:** a reorg onto a branch that is not yet longer went unnoticed.
+  ZecPy compares block hashes at the tip. Both fixes are prepared as a tested librustzcash
+  patch, plus a reproduced zcash-devtool bug (its `pczt sign` skips Ironwood spends).
+- **A signer that does not trust the server.** `zecpy-cold` identifies change outputs with
+  its own viewing key, so a compromised server cannot disguise a payment to itself as
+  change ([src/cold.rs](src/cold.rs)).
+
+## Quick start
+
+Needs Linux, Python 3.10+ and a Rust toolchain (tested with 1.99). Tested from a fresh
+clone with [uv](https://docs.astral.sh/uv/); the build took 11 minutes on a 4-core VPS,
+plus the time to download the crates.
+
+```bash
+git clone https://github.com/xerodahdev/zecpy && cd zecpy
+uv venv .venv && . .venv/bin/activate        # or python -m venv (Debian/Ubuntu: apt install python3-venv)
+uv pip install -e '.[dev,examples]'
+python -c "import zecpy; print(zecpy.__all__)"
+```
+
+Run the tests against a local chain ([devnet/README.md](devnet/README.md) lists the
+binaries): `devnet/up.sh <shielded address>`, then `pytest`. Tor tests against public
+testnet: `pytest -m network`.
+
+## What is real, what is not
+
+- **Real, tested:** everything above, on a local regtest chain with real blocks, proofs and
+  reorgs (`invalidateblock`): 68 tests. A send takes about 11 s on a 4-core VPS; the fee is
+  10,000 zatoshis.
+- **Real, public network:** wallet creation and sync over Tor against
+  `testnet.zec.rocks`, passing 3 of 3 runs. No payment was sent on testnet: both public
+  faucets were down during the build. No mainnet funds were moved.
+- **By design, not built:** transparent receiving and incoming memo reading (both need
+  requests that identify the wallet). The `pczt` dependency compiles librustzcash's
+  transparent code in; ZecPy never calls it, and the leak audit checks that on every run.
+
+## Limitations and next
+
+Linux only, built from source; no prebuilt wheels yet. A reorg costs one identifying
+tree-state request, and an orphaned incoming payment stays pending until it is re-mined
+([details](docs/privacy-model.md#known-limitations)). Next: file the upstream reports,
+wheels for macOS and Windows, and a testnet payment record once faucets return.
