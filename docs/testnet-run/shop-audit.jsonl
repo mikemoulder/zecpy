@@ -1,0 +1,108 @@
+{"label": "public", "method": "GetLatestBlock", "reason": "chain tip, asked by every wallet", "request": {}, "time": 1792946098.7710614}
+{"label": "coarse", "method": "GetTreeState", "reason": "tree state at 4539999: a 1000-block boundary every wallet crossing it asks for", "request": {"height": "4539999"}, "time": 1792946124.7811067}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946178.3759422}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946178.5837836}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946179.2116857}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946179.6530843}
+{"label": "coarse", "method": "GetTreeState", "reason": "tree state at 4539999: a 1000-block boundary every wallet crossing it asks for", "request": {"height": "4539999"}, "time": 1792946179.84529}
+{"label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "4540816"}, "start": {"height": "4540000"}}, "time": 1792946180.1027997}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946213.6874638}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946214.0134547}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946214.4324584}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946214.6565485}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946244.918}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946245.3565962}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946245.7829027}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946246.064324}
+{"label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "4540818"}, "start": {"height": "4540817"}}, "time": 1792946246.4930286}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946247.9202662}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946248.273748}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946248.4648845}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946248.9572985}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946279.3235023}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946279.5568748}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946279.7366467}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946281.1828651}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946311.4173632}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946311.7289424}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946311.931106}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946312.2181897}
+{"label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "4540819"}, "start": {"height": "4540819"}}, "time": 1792946312.3782983}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946312.7674196}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946313.029361}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946313.2092636}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946313.3794038}
+{"label": "identifying", "method": "GetTransaction", "reason": "fetches one transaction by txid: the server learns it is yours", "request": {"hash": "vVenq7XuY3uNKyaI+0y1F5PoCkl4Q7OvYqtGe4R5swk="}, "time": 1792946322.1943398}
+{"label": "identifying", "method": "GetTransaction", "reason": "fetches one transaction by txid: the server learns it is yours", "request": {"hash": "oKhHm1w+2VVlCukDkrOftEoxRYOOLkdiaxcs9QeKFLM="}, "time": 1792946322.6907136}
+{"label": "identifying", "method": "GetTransaction", "reason": "fetches one transaction by txid: the server learns it is yours", "request": {"hash": "J+hZaWUW2S92WjGpDjboVrBIxttXKkiBVZylIbg6HjM="}, "time": 1792946323.0010192}
+{"label": "identifying", "method": "GetTransaction", "reason": "fetches one transaction by txid: the server learns it is yours", "request": {"hash": "MoDy3fanSTuZMq8j12ev53/5tx6JZE+JOeXPomLwqo0="}, "time": 1792946323.413419}
+{"label": "identifying", "method": "GetTransaction", "reason": "fetches one transaction by txid: the server learns it is yours", "request": {"hash": "WdE4dlZW3SJShz2vLgpXfduWoOBG/M5eHDnF+4qWtbM="}, "time": 1792946323.661191}
+{"label": "identifying", "method": "GetTransaction", "reason": "fetches one transaction by txid: the server learns it is yours", "request": {"hash": "Mj+sA6xFVzYSHTEFACj1/ZU/mt1wyF8JhyRmCdPcC/4="}, "time": 1792946324.154364}
+{"label": "identifying", "method": "GetTransaction", "reason": "fetches one transaction by txid: the server learns it is yours", "request": {"hash": "PKWZkwwehbySrCWY0VuD6ws9FxrCIjh3KniPND3B6zI="}, "time": 1792946324.337396}
+{"label": "identifying", "method": "GetTransaction", "reason": "fetches one transaction by txid: the server learns it is yours", "request": {"hash": "h4ehWQKNYyN4LyAZaf8ce5WVipNSTEMvu8MqcqWFiRQ="}, "time": 1792946324.541175}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946324.8744764}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946325.157206}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946325.4137814}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946325.6852047}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946355.902891}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946356.6355329}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946357.4477642}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946357.8091593}
+{"label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "4540821"}, "start": {"height": "4540820"}}, "time": 1792946358.2484012}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946388.873985}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946389.2737985}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946389.8426893}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946390.3308673}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946420.7496974}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946421.1440089}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946421.582732}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946421.9263706}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946452.3645072}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946452.6128101}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946452.821913}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946453.010714}
+{"label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "4540823"}, "start": {"height": "4540822"}}, "time": 1792946453.1439452}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946483.421557}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946483.6658423}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946483.8160052}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946484.0266588}
+{"label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "4540824"}, "start": {"height": "4540824"}}, "time": 1792946484.4417062}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946514.683968}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946515.3659487}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946515.7286015}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946516.6428747}
+{"label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "4540825"}, "start": {"height": "4540825"}}, "time": 1792946518.4825175}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946550.0567975}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946550.2208729}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946550.3626442}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946550.588744}
+{"label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "4540828"}, "start": {"height": "4540826"}}, "time": 1792946550.78798}
+{"label": "broadcast", "method": "SendTransaction", "reason": "publishes a transaction", "request": {"data_bytes": 9166, "height": null}, "time": 1792946565.2332969}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946791.5148935}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946791.7431905}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946791.9935188}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946792.1887114}
+{"label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "4540840"}, "start": {"height": "4540829"}}, "time": 1792946792.7614324}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946823.2415195}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946824.09261}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946824.1925561}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946824.453374}
+{"label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "4540841"}, "start": {"height": "4540841"}}, "time": 1792946824.5555882}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946855.5824935}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946856.3635244}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946856.661112}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946857.1318305}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946888.2979155}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946889.6460583}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946890.0101728}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946890.3111024}
+{"label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "4540843"}, "start": {"height": "4540842"}}, "time": 1792946891.3350217}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946922.298238}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946922.4920022}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946922.6093457}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946922.7736163}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {}, "time": 1792946953.0116248}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "orchard"}, "time": 1792946953.2174861}
+{"label": "public", "method": "GetSubtreeRoots", "reason": "note commitment subtree roots, the same for every wallet", "request": {"shieldedProtocol": "ironwood"}, "time": 1792946953.4762323}
+{"label": "public", "method": "GetLatestTreeState", "reason": "tree state at the tip", "request": {}, "time": 1792946953.8334534}
+{"label": "public", "method": "GetBlockRange", "reason": "a range of compact blocks; every syncing wallet downloads them all", "request": {"end": {"height": "4540845"}, "start": {"height": "4540844"}}, "time": 1792946954.2467892}
