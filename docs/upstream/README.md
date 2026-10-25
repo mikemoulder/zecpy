@@ -1,13 +1,15 @@
 # Upstream contributions
 
 Problems in the Zcash libraries and tools that building ZecPy uncovered, written up for the
-maintainers. Prepared during ZECATHON and filed when ZecPy is published.
+maintainers. Found while building ZecPy, filed during ZECATHON.
 
-| Project | Finding | Evidence | Fix |
+| Project | Finding | Filed | Status |
 |---|---|---|---|
-| librustzcash `zcash_client_backend::sync` | Incremental syncs reveal, via `GetTreeState`, where the previous sync stopped, linking sessions | ZecPy leak audit; `docs/privacy-report.md` | Patch aligns batch boundaries; issue proposes persisting the tip tree state, as `src/sync.rs` does |
-| librustzcash `zcash_client_backend::sync` | A reorg onto a branch that is not yet longer goes unnoticed; the wallet reports stale confirmations | Reproduced with `invalidateblock` on regtest | Patch compares the block hash at the reported tip |
-| zcash-devtool `pczt sign` | Ironwood spends are left unsigned; the command still exits 0 | Reproduced on regtest: `MissingSpendAuthSig` at send | Issue suggests signing with `sign_ironwood` |
+| librustzcash `zcash_client_backend::sync` | Incremental syncs reveal, via `GetTreeState`, where the previous sync stopped, linking sessions | Issue [#3197](https://github.com/zcash/librustzcash/issues/3197) (design options), PR [#3198](https://github.com/zcash/librustzcash/pull/3198) (absolute batch boundaries) | Open |
+| librustzcash `zcash_client_backend::sync` | A reorg onto a branch that is not yet longer goes unnoticed; the wallet reports stale confirmations | PR [#3199](https://github.com/zcash/librustzcash/pull/3199) (hash check at the tip, `reorg_rewind_height` with unit tests) | Open |
+| zcash-devtool `pczt sign` | Ironwood spends are left unsigned; the command still exits 0 | Issue [#266](https://github.com/zcash/zcash-devtool/issues/266), PR [#267](https://github.com/zcash/zcash-devtool/pull/267) (verified before and after on regtest) | Open |
+
+Filed 2026-10-25 from xerodahdev. The texts below are the originals they were written from.
 
 Files:
 

@@ -2,7 +2,7 @@
 
 **Shielded Zcash for Python backends, with privacy you can measure: across create, sync, receive, restart and send, ZecPy sends its light server zero identifying requests. Two reference wallets send 7 and 71.**
 
-[Privacy report](docs/privacy-report.md) · [Bugs found upstream](docs/upstream/README.md) · [Checkout API example](examples/checkout/README.md) · [Privacy model](docs/privacy-model.md)
+[Privacy report](docs/privacy-report.md) · [Testnet run](docs/testnet-run.md) · [Bugs found upstream](docs/upstream/README.md) · [Checkout API example](examples/checkout/README.md) · [Privacy model](docs/privacy-model.md)
 
 ![Identifying requests seen by the light server, per wallet and scenario](assets/screenshots/privacy-report.svg)
 
@@ -92,9 +92,13 @@ testnet: `pytest -m network`.
 - **Real, tested:** everything above, on a local regtest chain with real blocks, proofs and
   reorgs (`invalidateblock`): 78 tests. A send takes about 11 s on a 4-core VPS; the fee is
   10,000 zatoshis.
-- **Real, public network:** wallet creation and sync over Tor against
-  `testnet.zec.rocks`, passing 3 of 3 runs. No payment was sent on testnet: both public
-  faucets were down during the build. No mainnet funds were moved.
+- **Real, public network:** a full merchant run on testnet against `testnet.zec.rocks`
+  ([record](docs/testnet-run.md)). A watch-only shop was paid by zcash-devtool, matched the
+  payment by address, read the memo among 7 real third-party decoys, and refunded through
+  the offline signer. An agent wallet refused a payment link over budget, then paid it
+  within budget over ZecPy's own Tor. Fourteen minutes, five transactions, all txids
+  listed. The shop's 108 requests were audited on their way to the server over Tor: none
+  identified it outside the opt-in memo fetch. No mainnet funds were moved.
 - **Unit-tested only:** the pool-crossing refusal. The regtest chain activates Ironwood at
   height 1, so it never holds Orchard notes and no real crossing can be built there; the
   per-pool calculation is tested on constructed inputs, and the ZIP 318 canonical check is
@@ -120,5 +124,5 @@ whose privacy cost ZecPy will not hide behind a default.
 
 Linux only, built from source; no prebuilt wheels yet. A reorg costs one identifying
 tree-state request, and an orphaned incoming payment stays pending until it is re-mined
-([details](docs/privacy-model.md#known-limitations)). Next: file the upstream reports,
-wheels for macOS and Windows, and a testnet payment record once faucets return.
+([details](docs/privacy-model.md#known-limitations)). Next: wheels for macOS and Windows,
+and the upstream fixes through review.
