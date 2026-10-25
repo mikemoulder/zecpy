@@ -52,8 +52,10 @@ def offline() -> None:
     again = ColdSigner(phrase, network="test").watch_bundle()
     check("same seed, same viewing key", again.ufvk == bundle.ufvk)
 
-    cli = shutil.which("zecpy-cold")
-    check("zecpy-cold on PATH", cli is not None, cli or "")
+    # Installed next to this interpreter, whether or not the environment is activated.
+    scripts = Path(sys.executable).parent
+    cli = shutil.which("zecpy-cold", path=str(scripts)) or shutil.which("zecpy-cold")
+    check("zecpy-cold installed", cli is not None, cli or f"not in {scripts}")
     done = subprocess.run([cli, "--help"], capture_output=True, text=True, timeout=60)
     check("zecpy-cold --help", done.returncode == 0 and "sign" in done.stdout)
 

@@ -10,10 +10,11 @@ name: wheels
 on:
   workflow_dispatch:
     inputs:
-      macos_only:
-        description: "Build only the macOS arm64 wheel"
-        type: boolean
-        default: false
+      only:
+        description: "Build one platform only (saves minutes while the repository is private)"
+        type: choice
+        options: [all, linux-x86_64, macos-arm64]
+        default: all
   push:
     tags: ["v*"]
 
@@ -25,15 +26,14 @@ env:
 
 jobs:
   linux:
-    if: ${{ !inputs.macos_only }}
+    if: ${{ !inputs.only || inputs.only == 'all' || inputs.only == 'linux-x86_64' }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - target: x86_64
-            runner: ubuntu-24.04
-          - target: aarch64
-            runner: ubuntu-24.04-arm
+        # Only the platforms asked for start a runner at all.
+        include: ${{ fromJSON(inputs.only == 'linux-x86_64'
+          && '[{"target":"x86_64","runner":"ubuntu-24.04"}]'
+          || '[{"target":"x86_64","runner":"ubuntu-24.04"},{"target":"aarch64","runner":"ubuntu-24.04-arm"}]') }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
@@ -66,6 +66,7 @@ jobs:
           path: dist/*.whl
 
   macos:
+    if: ${{ !inputs.only || inputs.only == 'all' || inputs.only == 'macos-arm64' }}
     strategy:
       fail-fast: false
       matrix:
@@ -126,7 +127,7 @@ jobs:
           path: dist/*.whl
 
   sdist:
-    if: ${{ !inputs.macos_only }}
+    if: ${{ !inputs.only || inputs.only == 'all' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
