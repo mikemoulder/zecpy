@@ -1,0 +1,158 @@
+# Builds ZecPy wheels, proves each one works on its own platform, and attaches them to a
+# GitHub release when a version tag is pushed.
+#
+# Runs on demand or on a tag, never on every push: wheel builds compile librustzcash and
+# Halo 2 from scratch, and macOS minutes are expensive while the repository is private.
+# Jobs marked "public" wait until the repository is public, where Actions is free.
+
+name: wheels
+
+on:
+  workflow_dispatch:
+    inputs:
+      macos_only:
+        description: "Build only the macOS arm64 wheel"
+        type: boolean
+        default: false
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  MATURIN_VERSION: "1.15.0"
+
+jobs:
+  linux:
+    if: ${{ !inputs.macos_only }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64
+            runner: ubuntu-24.04
+          - target: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build (manylinux_2_28)
+        uses: PyO3/maturin-action@v1
+        with:
+          maturin-version: ${{ env.MATURIN_VERSION }}
+          target: ${{ matrix.target }}
+          manylinux: "2_28"
+          args: --release --strip --out dist
+      - uses: actions/setup-python@v6
+        with:
+          python-version: |
+            3.10
+            3.13
+      - name: Smoke test on Python 3.10 and 3.13
+        run: |
+          for py in 3.10 3.13; do
+            python$py -m venv /tmp/venv-$py
+            /tmp/venv-$py/bin/pip install --quiet dist/*.whl
+            (cd /tmp && /tmp/venv-$py/bin/python $GITHUB_WORKSPACE/tests/smoke.py)
+          done
+      - name: Smoke test over Tor on public testnet
+        run: cd /tmp && /tmp/venv-3.13/bin/python $GITHUB_WORKSPACE/tests/smoke.py --network
+      - name: Wheel size
+        run: ls -la dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-linux-${{ matrix.target }}
+          path: dist/*.whl
+
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+            run_when: always
+          # Cross-built on Apple silicon; tested under Rosetta. Waits until public.
+          - target: x86_64-apple-darwin
+            runner: macos-latest
+            run_when: public
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Skip until the repository is public
+        id: gate
+        run: |
+          if [ "${{ matrix.run_when }}" = "public" ] && [ "${{ github.event.repository.private }}" = "true" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v5
+        if: steps.gate.outputs.skip != 'true'
+      - name: Build
+        if: steps.gate.outputs.skip != 'true'
+        uses: PyO3/maturin-action@v1
+        with:
+          maturin-version: ${{ env.MATURIN_VERSION }}
+          target: ${{ matrix.target }}
+          args: --release --strip --out dist
+      - uses: actions/setup-python@v6
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          python-version: |
+            3.10
+            3.13
+      - name: Smoke test on Python 3.10 and 3.13
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          prefix=""
+          if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
+            softwareupdate --install-rosetta --agree-to-license || true
+            prefix="arch -x86_64"
+          fi
+          for py in 3.10 3.13; do
+            $prefix python$py -m venv /tmp/venv-$py
+            $prefix /tmp/venv-$py/bin/pip install --quiet dist/*.whl
+            (cd /tmp && $prefix /tmp/venv-$py/bin/python $GITHUB_WORKSPACE/tests/smoke.py)
+          done
+      - name: Smoke test over Tor on public testnet
+        if: steps.gate.outputs.skip != 'true' && matrix.target == 'aarch64-apple-darwin'
+        run: cd /tmp && /tmp/venv-3.13/bin/python $GITHUB_WORKSPACE/tests/smoke.py --network
+      - name: Wheel size
+        if: steps.gate.outputs.skip != 'true'
+        run: ls -la dist
+      - uses: actions/upload-artifact@v4
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          name: wheel-macos-${{ matrix.target }}
+          path: dist/*.whl
+
+  sdist:
+    if: ${{ !inputs.macos_only }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: PyO3/maturin-action@v1
+        with:
+          maturin-version: ${{ env.MATURIN_VERSION }}
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, macos, sdist]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Attach wheels to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la dist
+          gh release create "${GITHUB_REF_NAME}" dist/* --repo "${GITHUB_REPOSITORY}" \
+            --title "ZecPy ${GITHUB_REF_NAME}" --notes "Prebuilt wheels: no Rust toolchain needed. Python 3.10+."
