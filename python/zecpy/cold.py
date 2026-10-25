@@ -88,9 +88,13 @@ class ColdSigner:
         return repr(self._native)
 
 
-def describe(summary: Summary) -> str:
+_UNITS = {"main": "ZEC", "test": "TAZ", "regtest": "REG"}
+
+
+def describe(summary: Summary, network: str = "main") -> str:
     """A human-readable account of a PCZT, for the person about to sign it."""
-    zec = lambda zat: f"{zat / 100_000_000:.8f} ZEC"  # noqa: E731
+    unit = _UNITS.get(network, "ZEC")
+    zec = lambda zat: f"{zat / 100_000_000:.8f} {unit}"  # noqa: E731
     lines = [f"Spends   {zec(summary.spending)} from this wallet"]
     for out in summary.outputs:
         if out.is_change:
@@ -139,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
         print(signer.watch_bundle().to_json())
         return 0
     pczt = args.pczt.read_bytes()
-    print(describe(signer.inspect(pczt)))
+    print(describe(signer.inspect(pczt), args.network))
     if args.command == "inspect":
         return 0
     if not args.yes:

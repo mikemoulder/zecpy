@@ -119,7 +119,7 @@ async def test_offline_cli_shows_and_signs(cold_pair, tmp_path, devnet):
         input=cli_signer_phrase + "\n", capture_output=True, text=True, timeout=120,
     )
     assert done.returncode == 0, done.stderr
-    assert "PAY" in done.stdout and "0.00120000 ZEC" in done.stdout
+    assert "PAY" in done.stdout and "0.00120000 REG" in done.stdout
     assert cli_signer_phrase not in done.stdout + done.stderr, "the mnemonic must never be echoed"
 
     await cli_hot.broadcast_signed(signed.read_bytes())
