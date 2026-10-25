@@ -51,12 +51,16 @@ class AuditProxy:
         upstream: str,
         *,
         upstream_tls: bool = False,
+        tls_name: str | None = None,
         log_path: Path | None = None,
         on_record: Callable[[Record], None] | None = None,
     ) -> None:
         self.listen = listen
         self.upstream = upstream
         self.upstream_tls = upstream_tls
+        # The name the upstream's TLS certificate is checked against, when `upstream` is a
+        # local tunnel (for example a SOCKS forwarder into Tor) rather than the server itself.
+        self.tls_name = tls_name
         self.log_path = log_path
         self.on_record = on_record
         self.records: list[Record] = []
@@ -138,7 +142,10 @@ class AuditProxy:
 
     async def start(self) -> None:
         if self.upstream_tls:
-            self._channel = grpc.aio.secure_channel(self.upstream, grpc.ssl_channel_credentials())
+            options = [("grpc.ssl_target_name_override", self.tls_name)] if self.tls_name else []
+            self._channel = grpc.aio.secure_channel(
+                self.upstream, grpc.ssl_channel_credentials(), options=options
+            )
         else:
             self._channel = grpc.aio.insecure_channel(self.upstream)
         handlers = {name: self._handler(m) for name, m in METHODS.items()}

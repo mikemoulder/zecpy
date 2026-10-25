@@ -40,6 +40,7 @@ async def _main(args: argparse.Namespace) -> None:
         args.listen,
         args.upstream,
         upstream_tls=args.tls,
+        tls_name=args.tls_name,
         log_path=Path(args.log) if args.log else None,
         on_record=_print,
     )
@@ -60,6 +61,8 @@ def main() -> None:
     parser.add_argument("--listen", default="127.0.0.1:19167")
     parser.add_argument("--upstream", default="127.0.0.1:19067")
     parser.add_argument("--tls", action="store_true", help="upstream uses TLS")
+    parser.add_argument("--tls-name", help="check the upstream certificate against this name "
+                        "(when --upstream is a local tunnel)")
     parser.add_argument("--log", help="append JSON lines to this file")
     try:
         asyncio.run(_main(parser.parse_args()))
