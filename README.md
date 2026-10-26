@@ -72,9 +72,31 @@ No cryptography is reimplemented. Details: [docs/architecture.md](docs/architect
 
 ## Quick start
 
-Needs Linux, Python 3.10+ and a Rust toolchain (tested with 1.99). Tested from a fresh
-clone with uv; the build took 11 minutes on a 4-core VPS,
-plus the time to download the crates.
+```bash
+pip install zecpy
+```
+
+Prebuilt wheels for Linux (x86_64, arm64) and macOS (Apple silicon, Intel), Python 3.10 or
+newer: no Rust toolchain, nothing to compile. Each wheel is installed and smoke-tested on
+its own platform in CI, including a wallet synced over Tor on public testnet
+([`tests/smoke.py`](tests/smoke.py)).
+
+```python
+import asyncio
+from zecpy import Wallet
+
+async def main():
+    wallet, mnemonic = await Wallet.create("./shop", network="test",
+                                           server="https://testnet.zec.rocks:443")
+    print(await wallet.sync(), wallet.address())
+
+asyncio.run(main())
+```
+
+### From source
+
+Needs a Rust toolchain (tested with 1.99). The first build compiles librustzcash: 11 to 19
+minutes on a 4-core machine, plus the time to download the crates.
 
 ```bash
 git clone https://github.com/xerodahdev/zecpy && cd zecpy
@@ -122,7 +144,7 @@ whose privacy cost ZecPy will not hide behind a default.
 
 ## Limitations and next
 
-Linux only, built from source; no prebuilt wheels yet. A reorg costs one identifying
+No Windows wheel yet. A reorg costs one identifying
 tree-state request, and an orphaned incoming payment stays pending until it is re-mined
-([details](docs/privacy-model.md#known-limitations)). Next: wheels for macOS and Windows,
-and the upstream fixes through review.
+([details](docs/privacy-model.md#known-limitations)). Next: a Windows wheel, and the upstream fixes
+through review.
