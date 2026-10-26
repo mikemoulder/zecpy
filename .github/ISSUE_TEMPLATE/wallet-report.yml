@@ -1,0 +1,23 @@
+name: Add a wallet to the privacy report
+description: Measure another light wallet with the leak-audit proxy.
+labels: [privacy-report]
+body:
+  - type: input
+    id: wallet
+    attributes:
+      label: Wallet and version
+      placeholder: "name, version or commit"
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How it can be driven through the five scenarios
+      description: create, first sync, receive and sync, restart and sync, send. CLI, script or SDK.
+    validations:
+      required: true
+  - type: textarea
+    id: record
+    attributes:
+      label: Audit record, if you already ran it
+      description: The summary from `python -m tools.leak_audit`, with real addresses removed.

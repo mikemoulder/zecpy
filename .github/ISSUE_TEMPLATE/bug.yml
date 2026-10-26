@@ -1,0 +1,38 @@
+name: Bug report
+description: Something does not work as documented. For leaks and vulnerabilities, report privately instead.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If the bug lets a light server learn anything about the wallet, or risks funds or keys,
+        stop here and use **Report a privacy leak or a vulnerability (private)** instead.
+        Never paste a seed, a key, or a mainnet address.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Ideally on testnet or the local devnet. A minimal script is best.
+      render: python
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ZecPy version, Python version, platform
+      placeholder: "zecpy 0.1.0, Python 3.12, macOS 15 (Apple silicon)"
+    validations:
+      required: true
+  - type: dropdown
+    id: network
+    attributes:
+      label: Network
+      options: [testnet, regtest (devnet), mainnet]
+    validations:
+      required: true

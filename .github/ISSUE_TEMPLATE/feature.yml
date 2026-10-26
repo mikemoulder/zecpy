@@ -1,0 +1,25 @@
+name: Feature request
+description: Propose something new. Every feature is weighed against what the light server would learn.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you are trying to do
+      description: The application problem, not only the API you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: server
+    attributes:
+      label: What would the light server see?
+      description: |
+        New requests, new timing, new data stored. If it would need a request that names an
+        address or a transaction, say so: that usually means opt-in, Tor, and a line in the
+        privacy model.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
