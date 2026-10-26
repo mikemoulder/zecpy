@@ -37,6 +37,13 @@ zecpy-cold = "zecpy.cold:main"
 [tool.maturin]
 python-source = "python"
 module-name = "zecpy._native"
+# Working notes of the build stay in the repository, out of the package.
+exclude = [
+    { path = "CLAUDE.md", format = "sdist" },
+    { path = "handoff.md", format = "sdist" },
+    { path = "memory.md", format = "sdist" },
+    { path = "hackathon.yml", format = "sdist" },
+]
 features = ["pyo3/extension-module"]
 
 [tool.pytest.ini_options]
