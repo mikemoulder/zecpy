@@ -2,9 +2,9 @@
 
 **Shielded Zcash for Python backends, with privacy you can measure: across create, sync, receive, restart and send, ZecPy sends its light server zero identifying requests. Two reference wallets send 7 and 71.**
 
-[Privacy report](docs/privacy-report.md) · [Testnet run](docs/testnet-run.md) · [Bugs found upstream](docs/upstream/README.md) · [Checkout API example](examples/checkout/README.md) · [Privacy model](docs/privacy-model.md)
+[Website and docs](https://zecpy.pages.dev) · [Privacy report](https://github.com/xerodahdev/zecpy/blob/main/docs/privacy-report.md) · [Testnet run](https://github.com/xerodahdev/zecpy/blob/main/docs/testnet-run.md) · [Bugs found upstream](https://github.com/xerodahdev/zecpy/blob/main/docs/upstream/README.md) · [Checkout API example](https://github.com/xerodahdev/zecpy/blob/main/examples/checkout/README.md) · [Privacy model](https://github.com/xerodahdev/zecpy/blob/main/docs/privacy-model.md)
 
-![Identifying requests seen by the light server, per wallet and scenario](assets/screenshots/privacy-report.svg)
+![Identifying requests seen by the light server, per wallet and scenario](https://raw.githubusercontent.com/xerodahdev/zecpy/main/assets/screenshots/privacy-report.svg)
 
 Built for ZECATHON (Core & Tooling) on librustzcash, Orchard and Ironwood, with Tor via arti.
 
@@ -55,20 +55,25 @@ tools/leak_audit/ gRPC proxy that decodes and classifies every request a wallet 
 devnet/           local regtest chain: zebrad 7.0.0 + lightwalletd 0.6.0, Ironwood active
 ```
 
-No cryptography is reimplemented. Details: [docs/architecture.md](docs/architecture.md).
+No cryptography is reimplemented. Details: [docs/architecture.md](https://github.com/xerodahdev/zecpy/blob/main/docs/architecture.md).
 
 ## Technical highlights
 
 - **A leak in librustzcash's own sync, found by measuring.** `sync::run` asks for the tree
   state where the previous sync stopped, linking sessions. ZecPy's sync loop
-  ([src/sync.rs](src/sync.rs)) takes the tip's state from `GetLatestTreeState`, saves it, and
+  ([src/sync.rs](https://github.com/xerodahdev/zecpy/blob/main/src/sync.rs)) takes the tip's state from `GetLatestTreeState`, saves it, and
   splits batches only at absolute multiples of 1,000.
 - **A reorg bug it also shares:** a reorg onto a branch that is not yet longer went unnoticed.
-  ZecPy compares block hashes at the tip. Both fixes are prepared as a tested librustzcash
-  patch, plus a reproduced zcash-devtool bug (its `pczt sign` skips Ironwood spends).
+  ZecPy compares block hashes at the tip. Both are filed upstream with fixes:
+  [librustzcash #3197](https://github.com/zcash/librustzcash/issues/3197),
+  [PR #3198](https://github.com/zcash/librustzcash/pull/3198) and
+  [PR #3199](https://github.com/zcash/librustzcash/pull/3199), plus a zcash-devtool bug
+  found the same way, its `pczt sign` skipping Ironwood spends
+  ([#266](https://github.com/zcash/zcash-devtool/issues/266), fix
+  [PR #267](https://github.com/zcash/zcash-devtool/pull/267)).
 - **A signer that does not trust the server.** `zecpy-cold` identifies change outputs with
   its own viewing key, so a compromised server cannot disguise a payment to itself as
-  change ([src/cold.rs](src/cold.rs)).
+  change ([src/cold.rs](https://github.com/xerodahdev/zecpy/blob/main/src/cold.rs)).
 
 ## Quick start
 
@@ -76,10 +81,10 @@ No cryptography is reimplemented. Details: [docs/architecture.md](docs/architect
 pip install zecpy
 ```
 
-Prebuilt wheels for Linux (x86_64, arm64) and macOS (Apple silicon, Intel), Python 3.10 or
-newer: no Rust toolchain, nothing to compile. Each wheel is installed and smoke-tested on
+Prebuilt wheels for Linux x86_64 and macOS on Apple silicon, Python 3.10 or newer: no Rust
+toolchain, nothing to compile. Other platforms build from source (below). Each wheel is installed and smoke-tested on
 its own platform in CI, including a wallet synced over Tor on public testnet
-([`tests/smoke.py`](tests/smoke.py)).
+([`tests/smoke.py`](https://github.com/xerodahdev/zecpy/blob/main/tests/smoke.py)).
 
 ```python
 import asyncio
@@ -105,7 +110,7 @@ uv pip install -e '.[dev,examples]'
 python -c "import zecpy; print(zecpy.__all__)"
 ```
 
-Run the tests against a local chain ([devnet/README.md](devnet/README.md) lists the
+Run the tests against a local chain ([devnet/README.md](https://github.com/xerodahdev/zecpy/blob/main/devnet/README.md) lists the
 binaries): `devnet/up.sh <shielded address>`, then `pytest`. Tor tests against public
 testnet: `pytest -m network`.
 
@@ -115,7 +120,7 @@ testnet: `pytest -m network`.
   reorgs (`invalidateblock`): 78 tests. A send takes about 11 s on a 4-core VPS; the fee is
   10,000 zatoshis.
 - **Real, public network:** a full merchant run on testnet against `testnet.zec.rocks`
-  ([record](docs/testnet-run.md)). A watch-only shop was paid by zcash-devtool, matched the
+  ([record](https://github.com/xerodahdev/zecpy/blob/main/docs/testnet-run.md)). A watch-only shop was paid by zcash-devtool, matched the
   payment by address, read the memo among 7 real third-party decoys, and refunded through
   the offline signer. An agent wallet refused a payment link over budget, then paid it
   within budget over ZecPy's own Tor. Fourteen minutes, five transactions, all txids
@@ -142,9 +147,21 @@ whose privacy cost ZecPy will not hide behind a default.
 | Status lookups for orphaned payments | `GetTransaction` by txid; an orphaned payment stays pending until re-mined | See the privacy model |
 | More than one account, multisig, hardware wallets | Out of scope for a backend SDK | zcash-devtool `zip48`, `pczt` |
 
+## Prior art
+
+- [zcash-devtool](https://github.com/zcash/zcash-devtool): the official CLI on the same
+  librustzcash crates, and ZecPy's reference for how they fit together. It is the control
+  wallet in the privacy report.
+- [pyzcash](https://github.com/davisonio/pyzcash): PyO3 bindings for addresses, ZIP-321 and
+  seed to Unified Address. No sync or send.
+- [zeccheckout](https://github.com/samizdatproject/zeccheckout): a Rust checkout service
+  with viewing-key invoices on testnet. The same payment-detection idea as a service; ZecPy
+  is a library.
+- WebZjs and the mobile SDKs bring librustzcash to other languages, not Python.
+
 ## Limitations and next
 
 No Windows wheel yet. A reorg costs one identifying
 tree-state request, and an orphaned incoming payment stays pending until it is re-mined
-([details](docs/privacy-model.md#known-limitations)). Next: a Windows wheel, and the upstream fixes
+([details](https://github.com/xerodahdev/zecpy/blob/main/docs/privacy-model.md#known-limitations)). Next: a Windows wheel, and the upstream fixes
 through review.
