@@ -5,7 +5,7 @@ hackathon:
   url:      https://thezecathon.com/
   tracks:   [Shielded Payments, Private Markets, Cross-Chain, Core & Tooling, Wildcard]
   format:   online
-  deadline: 2026-10-28   # exact cutoff time behind sign-in, confirm it
+  deadline: 2026-10-28T23:59Z   # from the form countdown on 2026-10-26; resubmit allowed until then
 
 target_tracks: [Core & Tooling]   # one submission, one track
 
@@ -18,10 +18,12 @@ rubric:            # official criteria, equal weight assumed until confirmed
   execution:   25
   originality: 25
 
-requires:
-  deployed_url: false   # deliverable is a library, wheel, examples, docs
-  video:        true
-  open_source:  true
+requires:                # from the submission form, read 2026-10-26
+  deployed_url: true     # "Working demo: something the judges can open and use" -> the ZecPy website
+  video:        true     # "Two minutes. YouTube, Loom, anything with a link"
+  open_source:  true     # repo private until the deadline, public by then, or not judged
+  description:  2000     # chars: what it does, why it does not leak, what is real and what is a mock
+  track:        one      # pick exactly one
 
 repo:
   layout: flat
