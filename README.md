@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://zecpy.pages.dev"><img src="assets/brand/banner.png" alt="ZecPy: private Zcash payments for Python. Measured, not promised. Requests that identify the wallet, same five scenarios: ZecPy 0, zcash-devtool 7, zingo-cli 71." width="100%"></a>
+  <a href="https://zecpy.pages.dev"><img src="assets/readme-banner.png" alt="ZecPy: private Zcash payments for Python. Measured, not promised. Requests that identify the wallet, same five scenarios: ZecPy 0, zcash-devtool 7, zingo-cli 71." width="100%"></a>
 </p>
 
 <p align="center">

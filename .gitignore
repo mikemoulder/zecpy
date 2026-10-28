@@ -63,3 +63,8 @@ Thumbs.db
 # Local continuity notes, excluded from the published repository.
 /handoff.md
 /memory.md
+
+# Local demo production files and editable brand artwork.
+/demo-video/
+/assets/brand/
+/ref.mp4
