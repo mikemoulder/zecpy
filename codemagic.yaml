@@ -1,0 +1,46 @@
+# Manual macOS wheel build while GitHub Actions runners are unavailable.
+# Connect this repository to Codemagic, then start the macos-wheel workflow on main.
+workflows:
+  macos-wheel:
+    name: ZecPy macOS arm64 wheel
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    scripts:
+      - name: Install Rust and Python build tools
+        script: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
+          fi
+          export PATH="$HOME/.cargo/bin:$PATH"
+          rustup toolchain install 1.90.0 --profile minimal
+          rustup default 1.90.0
+          python3 -m venv /tmp/zecpy-build-tools
+          /tmp/zecpy-build-tools/bin/python -m pip install --disable-pip-version-check 'maturin==1.15.0' uv
+          /tmp/zecpy-build-tools/bin/uv python install 3.10 3.13
+
+      - name: Build Apple silicon wheel
+        script: |
+          set -euo pipefail
+          export PATH="$HOME/.cargo/bin:$PATH"
+          test "$(uname -m)" = arm64
+          /tmp/zecpy-build-tools/bin/maturin build --release --strip --target aarch64-apple-darwin --out dist
+          ls -lh dist/*.whl
+
+      - name: Smoke test installed wheel on Python 3.10 and 3.13
+        script: |
+          set -euo pipefail
+          wheel="$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
+          test -n "$wheel"
+          wheel="$(pwd)/$wheel"
+          for py in 3.10 3.13; do
+            venv="/tmp/zecpy-smoke-$py"
+            /tmp/zecpy-build-tools/bin/uv venv --managed-python --python "$py" "$venv"
+            /tmp/zecpy-build-tools/bin/uv pip install --python "$venv/bin/python" "$wheel"
+            "$venv/bin/python" -c 'import platform; assert platform.machine() == "arm64"'
+            (cd /tmp && "$venv/bin/python" "$CM_BUILD_DIR/tests/smoke.py")
+          done
+          shasum -a 256 dist/*.whl
+
+    artifacts:
+      - dist/*.whl
