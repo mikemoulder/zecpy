@@ -24,8 +24,8 @@ classifiers = [
 [project.urls]
 Homepage = "https://zecpy.pages.dev"
 Documentation = "https://zecpy.pages.dev/docs/"
-Repository = "https://github.com/xerodahdev/zecpy"
-"Privacy report" = "https://github.com/xerodahdev/zecpy/blob/main/docs/privacy-report.md"
+Repository = "https://github.com/mikemoulder/zecpy"
+"Privacy report" = "https://github.com/mikemoulder/zecpy/blob/main/docs/privacy-report.md"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-asyncio>=0.24", "httpx>=0.27", "grpcio>=1.76", "grpcio-tools>=1.76"]

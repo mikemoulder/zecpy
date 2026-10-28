@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a privacy leak or a vulnerability (private)
-    url: https://github.com/xerodahdev/zecpy/security/advisories/new
+    url: https://github.com/mikemoulder/zecpy/security/advisories/new
     about: Leaks and vulnerabilities are reported privately, never in a public issue.
   - name: Documentation
     url: https://zecpy.pages.dev/docs/

@@ -296,7 +296,7 @@ hard, not yet audited. Use testnet, or mainnet amounts you can afford to lose.
 | Project | What it is |
 |---|---|
 | [**zecpy.pages.dev**](https://zecpy.pages.dev) | Website and documentation: quick start, guides, API reference, privacy model |
-| [**ZecPy Live**](https://zecpy-live.pages.dev) ([source](https://github.com/xerodahdev/zecpy-demo)) | Press Run and watch every request the light server receives, as it arrives |
+| [**ZecPy Live**](https://zecpy-live.pages.dev) ([source](https://github.com/mikemoulder/zecpy-demo)) | Press Run and watch every request the light server receives, as it arrives |
 | [**llms.txt**](https://zecpy.pages.dev/llms.txt) · [**AGENTS.md**](https://zecpy.pages.dev/AGENTS.md) | The docs as plain text for language models, and rules for coding agents |
 | [**Checkout API**](examples/checkout) | A FastAPI shop backend with signed webhooks and no spending key on the server |
 | [**Payroll**](examples/payroll.py) | Pay a CSV in one shielded transaction, optionally through the cold signer |
@@ -307,7 +307,7 @@ Needs a Rust toolchain (tested with 1.99). The first build compiles librustzcash
 11 to 19 minutes on a 4-core machine.
 
 ```bash
-git clone https://github.com/xerodahdev/zecpy && cd zecpy
+git clone https://github.com/mikemoulder/zecpy && cd zecpy
 uv venv .venv && . .venv/bin/activate          # or: python -m venv .venv
 uv pip install -e '.[dev,examples]'
 ```

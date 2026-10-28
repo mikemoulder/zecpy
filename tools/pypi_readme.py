@@ -12,8 +12,8 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BLOB = "https://github.com/xerodahdev/zecpy/blob/main/"
-RAW = "https://raw.githubusercontent.com/xerodahdev/zecpy/main/"
+BLOB = "https://github.com/mikemoulder/zecpy/blob/main/"
+RAW = "https://raw.githubusercontent.com/mikemoulder/zecpy/main/"
 ABSOLUTE = re.compile(r"^(https?:|mailto:|#)")
 
 

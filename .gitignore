@@ -55,8 +55,10 @@ Thumbs.db
 # Deliberately NOT ignored:
 #   *.md          docs/ is judge-facing evidence (architecture, privacy model,
 #                 integrations). Ignoring markdown hides it.
-#   handoff.md    shared continuity.
-#   memory.md     shared project knowledge.
 
 # Third-party Claude skills used for the website live in their own repo
 .claude/skills/
+
+# Local continuity notes, excluded from the published repository.
+/handoff.md
+/memory.md

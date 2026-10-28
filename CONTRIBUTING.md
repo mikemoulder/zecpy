@@ -35,7 +35,7 @@ The full set of invariants every change is held to:
 | **A Windows wheel** | Rust on Windows, MSVC, arti | `.github/workflows/wheels.yml`, then `tests/smoke.py` on Windows |
 | **An MCP server for agents** | Agent framework users | `parse_request` as a read-only tool, `pay` with a budget set by code (see the [agent guide](https://zecpy.pages.dev/docs/agents)) |
 | **Removing ZecPy's own sync loop** | Rust, librustzcash | Help land [librustzcash #3197](https://github.com/zcash/librustzcash/issues/3197), [#3198](https://github.com/zcash/librustzcash/pull/3198) and [#3199](https://github.com/zcash/librustzcash/pull/3199) upstream |
-| **Docs and examples** | Anyone | The website sources live in [zecpy-site](https://github.com/xerodahdev/zecpy-site); examples in `examples/` |
+| **Docs and examples** | Anyone | The website sources live in [zecpy-site](https://github.com/mikemoulder/zecpy-site); examples in `examples/` |
 | **Review** | Zcash protocol people | Read [docs/privacy-model.md](docs/privacy-model.md) and tell us what it gets wrong |
 
 Issues labelled `good first issue` are small and well described. If you want to work on
@@ -47,7 +47,7 @@ You need Linux or macOS, Python 3.10 or newer, and a Rust toolchain
 ([rustup](https://rustup.rs); tested with 1.99).
 
 ```bash
-git clone https://github.com/xerodahdev/zecpy && cd zecpy
+git clone https://github.com/mikemoulder/zecpy && cd zecpy
 uv venv .venv && . .venv/bin/activate        # or: python -m venv .venv
 uv pip install -e '.[dev,examples]'           # builds the Rust extension in place
 ```

@@ -73,6 +73,6 @@ next step. Update `memory.md` only when something durable changed.
 - Add AI attribution to a commit: no `Co-Authored-By` naming a tool, no generated-by
   footer, no robot emoji.
 - Use em dashes in the README, docs, commit messages or comments.
-- Commit or push as anyone but `xerodahdev <xero.dev.ai@gmail.com>`, over an HTTPS remote.
+- Commit or push as anyone but `mikemoulder <dayoife321@gmail.com>`, over an HTTPS remote.
 - Touch `/home/coder/zecathon`. It is a separate project.
 - Refactor after Tue Oct 27 midday.

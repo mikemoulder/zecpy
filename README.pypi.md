@@ -1,13 +1,13 @@
 <!-- Generated from README.md by tools/pypi_readme.py for PyPI. Edit README.md. -->
 <p align="center">
-  <a href="https://zecpy.pages.dev"><img src="https://raw.githubusercontent.com/xerodahdev/zecpy/main/assets/brand/banner.png" alt="ZecPy: private Zcash payments for Python. Measured, not promised. Requests that identify the wallet, same five scenarios: ZecPy 0, zcash-devtool 7, zingo-cli 71." width="100%"></a>
+  <a href="https://zecpy.pages.dev"><img src="https://raw.githubusercontent.com/mikemoulder/zecpy/main/assets/brand/banner.png" alt="ZecPy: private Zcash payments for Python. Measured, not promised. Requests that identify the wallet, same five scenarios: ZecPy 0, zcash-devtool 7, zingo-cli 71." width="100%"></a>
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/zecpy/"><img alt="PyPI" src="https://img.shields.io/pypi/v/zecpy?color=f4b728&labelColor=18191b"></a>
   <a href="https://pypi.org/project/zecpy/"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-eff0f1?labelColor=18191b"></a>
-  <a href="https://github.com/xerodahdev/zecpy/blob/main/docs/privacy-report.md"><img alt="Identifying requests: 0" src="https://img.shields.io/badge/identifying%20requests-0-f4b728?labelColor=18191b"></a>
-  <a href="https://github.com/xerodahdev/zecpy/blob/main/docs/testnet-run.md"><img alt="Verified on public testnet over Tor" src="https://img.shields.io/badge/testnet-verified%20over%20Tor-eff0f1?labelColor=18191b"></a>
+  <a href="https://github.com/mikemoulder/zecpy/blob/main/docs/privacy-report.md"><img alt="Identifying requests: 0" src="https://img.shields.io/badge/identifying%20requests-0-f4b728?labelColor=18191b"></a>
+  <a href="https://github.com/mikemoulder/zecpy/blob/main/docs/testnet-run.md"><img alt="Verified on public testnet over Tor" src="https://img.shields.io/badge/testnet-verified%20over%20Tor-eff0f1?labelColor=18191b"></a>
   <a href="#license"><img alt="License: MIT or Apache-2.0" src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-eff0f1?labelColor=18191b"></a>
 </p>
 
@@ -15,10 +15,10 @@
   <a href="https://zecpy.pages.dev"><b>Website</b></a> ·
   <a href="https://zecpy.pages.dev/docs/">Docs</a> ·
   <a href="https://zecpy-live.pages.dev">Live demo</a> ·
-  <a href="https://github.com/xerodahdev/zecpy/blob/main/docs/privacy-report.md">Privacy report</a> ·
-  <a href="https://github.com/xerodahdev/zecpy/blob/main/docs/testnet-run.md">Testnet run</a> ·
+  <a href="https://github.com/mikemoulder/zecpy/blob/main/docs/privacy-report.md">Privacy report</a> ·
+  <a href="https://github.com/mikemoulder/zecpy/blob/main/docs/testnet-run.md">Testnet run</a> ·
   <a href="https://zecpy.pages.dev/llms.txt">llms.txt</a> ·
-  <a href="https://github.com/xerodahdev/zecpy/blob/main/CONTRIBUTING.md">Contributing</a>
+  <a href="https://github.com/mikemoulder/zecpy/blob/main/CONTRIBUTING.md">Contributing</a>
 </p>
 
 ---
@@ -83,7 +83,7 @@ async for event in wallet.invoices.watch(confirmations=3):
 
 Privacy claims are easy to make. ZecPy ships the tool that checks them.
 
-**1. A recording proxy between wallet and server.** [`tools/leak_audit`](https://github.com/xerodahdev/zecpy/blob/main/tools/leak_audit)
+**1. A recording proxy between wallet and server.** [`tools/leak_audit`](https://github.com/mikemoulder/zecpy/blob/main/tools/leak_audit)
 sits between any light wallet and its server, forwards every byte unchanged, and labels
 every request by what it reveals: public, coarse, broadcast, or identifying. Unknown requests
 count as identifying, so the audit fails closed. Same five scenarios for each wallet, on a
@@ -98,7 +98,7 @@ local chain with real blocks and proofs:
 | Send a payment | **0** of 1 | 0 of 1 | 0 of 1 |
 | **Identifying requests** | **0** | **7** | **71** |
 
-Raw logs and how to read them fairly: [docs/privacy-report.md](https://github.com/xerodahdev/zecpy/blob/main/docs/privacy-report.md).
+Raw logs and how to read them fairly: [docs/privacy-report.md](https://github.com/mikemoulder/zecpy/blob/main/docs/privacy-report.md).
 
 **2. The same audit on public testnet, over Tor.** A full merchant run against
 `testnet.zec.rocks`: a watch-only shop paid from another wallet, the payment matched by
@@ -106,13 +106,13 @@ address alone, the memo read, a refund signed on an offline machine, and an AI a
 refused a payment link over its budget and paid it within budget. **108 requests from the
 shop; none identified it outside the opt-in memo fetch, which hid the real payment as the
 6th of 8 among real third-party transactions.** Fourteen minutes, five transactions, every
-txid listed: [docs/testnet-run.md](https://github.com/xerodahdev/zecpy/blob/main/docs/testnet-run.md).
+txid listed: [docs/testnet-run.md](https://github.com/mikemoulder/zecpy/blob/main/docs/testnet-run.md).
 
 **3. 78 tests on a real chain.** The privacy guarantees are asserted by tests that run the
 wallet through the audit proxy on a local regtest chain: no transparent queries, no lone
 transaction lookups, decoys that never include a coinbase, a coarse birthday, nothing
 linking one sync to the next. Reorgs are staged with `invalidateblock`. Each released wheel is also installed on its own platform in
-CI and syncs a wallet over Tor on public testnet ([`tests/smoke.py`](https://github.com/xerodahdev/zecpy/blob/main/tests/smoke.py)).
+CI and syncs a wallet over Tor on public testnet ([`tests/smoke.py`](https://github.com/mikemoulder/zecpy/blob/main/tests/smoke.py)).
 
 **4. Bugs found in Zcash's own code, and fixed upstream.** Measuring found problems in the
 libraries every Zcash wallet builds on. Each is filed with a tested fix:
@@ -172,7 +172,7 @@ txid = await wallet.send_many([
 ```
 
 Up to 50 recipients, one shielded transaction: cheaper than separate sends, and no burst of
-payments whose timing links them. [`examples/payroll.py`](https://github.com/xerodahdev/zecpy/blob/main/examples/payroll.py) pays a CSV.
+payments whose timing links them. [`examples/payroll.py`](https://github.com/mikemoulder/zecpy/blob/main/examples/payroll.py) pays a CSV.
 </details>
 
 <details>
@@ -273,8 +273,8 @@ Python owns the developer-facing API and the invoice book. Rust owns everything
 cryptographic and everything that talks to the chain. The wallet is a directory: the
 librustzcash SQLite database, the invoice book, the saved chain state and the Tor state. The
 seed is never written to disk, and seeds, keys and memos are kept out of logs, reprs and
-error messages. Details: [docs/architecture.md](https://github.com/xerodahdev/zecpy/blob/main/docs/architecture.md) and the
-[privacy model](https://github.com/xerodahdev/zecpy/blob/main/docs/privacy-model.md).
+error messages. Details: [docs/architecture.md](https://github.com/mikemoulder/zecpy/blob/main/docs/architecture.md) and the
+[privacy model](https://github.com/mikemoulder/zecpy/blob/main/docs/privacy-model.md).
 
 ## Status
 
@@ -282,14 +282,14 @@ ZecPy is **alpha**: built for [ZECATHON](https://thezecathon.com) (Core & Toolin
 hard, not yet audited. Use testnet, or mainnet amounts you can afford to lose.
 
 - **Real and tested:** everything above, on a local regtest chain with real blocks, proofs
-  and reorgs (78 tests), and on public testnet over Tor ([record](https://github.com/xerodahdev/zecpy/blob/main/docs/testnet-run.md)). A
+  and reorgs (78 tests), and on public testnet over Tor ([record](https://github.com/mikemoulder/zecpy/blob/main/docs/testnet-run.md)). A
   send takes about 11 seconds on a 4-core machine; the fee is 10,000 zatoshis.
 - **Unit-tested only:** the pool-crossing refusal. Funds arrive in Ironwood on current
   chains, so no real Orchard to Ironwood crossing could be built; the check itself is
   librustzcash's `Step::is_canonical_crossing`.
 - **Known limitations:** one account per wallet; no Windows wheel yet; a reorg costs one
   identifying tree-state request; a payment orphaned by a reorg stays pending until it is
-  mined again ([details](https://github.com/xerodahdev/zecpy/blob/main/docs/privacy-model.md#known-limitations)).
+  mined again ([details](https://github.com/mikemoulder/zecpy/blob/main/docs/privacy-model.md#known-limitations)).
 - **No mainnet funds were moved** during development.
 
 ## The ZecPy ecosystem
@@ -297,10 +297,10 @@ hard, not yet audited. Use testnet, or mainnet amounts you can afford to lose.
 | Project | What it is |
 |---|---|
 | [**zecpy.pages.dev**](https://zecpy.pages.dev) | Website and documentation: quick start, guides, API reference, privacy model |
-| [**ZecPy Live**](https://zecpy-live.pages.dev) ([source](https://github.com/xerodahdev/zecpy-demo)) | Press Run and watch every request the light server receives, as it arrives |
+| [**ZecPy Live**](https://zecpy-live.pages.dev) ([source](https://github.com/mikemoulder/zecpy-demo)) | Press Run and watch every request the light server receives, as it arrives |
 | [**llms.txt**](https://zecpy.pages.dev/llms.txt) · [**AGENTS.md**](https://zecpy.pages.dev/AGENTS.md) | The docs as plain text for language models, and rules for coding agents |
-| [**Checkout API**](https://github.com/xerodahdev/zecpy/blob/main/examples/checkout) | A FastAPI shop backend with signed webhooks and no spending key on the server |
-| [**Payroll**](https://github.com/xerodahdev/zecpy/blob/main/examples/payroll.py) | Pay a CSV in one shielded transaction, optionally through the cold signer |
+| [**Checkout API**](https://github.com/mikemoulder/zecpy/blob/main/examples/checkout) | A FastAPI shop backend with signed webhooks and no spending key on the server |
+| [**Payroll**](https://github.com/mikemoulder/zecpy/blob/main/examples/payroll.py) | Pay a CSV in one shielded transaction, optionally through the cold signer |
 
 ## Build from source
 
@@ -308,12 +308,12 @@ Needs a Rust toolchain (tested with 1.99). The first build compiles librustzcash
 11 to 19 minutes on a 4-core machine.
 
 ```bash
-git clone https://github.com/xerodahdev/zecpy && cd zecpy
+git clone https://github.com/mikemoulder/zecpy && cd zecpy
 uv venv .venv && . .venv/bin/activate          # or: python -m venv .venv
 uv pip install -e '.[dev,examples]'
 ```
 
-Run the tests against a local chain ([devnet/README.md](https://github.com/xerodahdev/zecpy/blob/main/devnet/README.md) lists the
+Run the tests against a local chain ([devnet/README.md](https://github.com/mikemoulder/zecpy/blob/main/devnet/README.md) lists the
 binaries): `devnet/up.sh <shielded address>`, then `pytest`. Tor tests against public
 testnet: `pytest -m network`.
 
@@ -321,11 +321,11 @@ testnet: `pytest -m network`.
 
 ZecPy has one rule that outranks the rest: **the leak budget is zero.** A change that makes
 the light server learn something new about the wallet is a bug, however useful the feature.
-[CONTRIBUTING.md](https://github.com/xerodahdev/zecpy/blob/main/CONTRIBUTING.md) explains how to set up the local chain, how to prove a
+[CONTRIBUTING.md](https://github.com/mikemoulder/zecpy/blob/main/CONTRIBUTING.md) explains how to set up the local chain, how to prove a
 change leaks nothing with the audit proxy, and where help is most wanted: a Windows wheel,
 more wallets in the privacy report, and an MCP server for agents.
 
-Found a leak or a vulnerability? Please report it privately: [SECURITY.md](https://github.com/xerodahdev/zecpy/blob/main/SECURITY.md).
+Found a leak or a vulnerability? Please report it privately: [SECURITY.md](https://github.com/mikemoulder/zecpy/blob/main/SECURITY.md).
 
 ## Acknowledgements and prior art
 
@@ -342,5 +342,5 @@ Found a leak or a vulnerability? Please report it privately: [SECURITY.md](https
 
 ## License
 
-Licensed under either of [Apache License 2.0](https://github.com/xerodahdev/zecpy/blob/main/LICENSE-APACHE) or [MIT](https://github.com/xerodahdev/zecpy/blob/main/LICENSE-MIT), at your
+Licensed under either of [Apache License 2.0](https://github.com/mikemoulder/zecpy/blob/main/LICENSE-APACHE) or [MIT](https://github.com/mikemoulder/zecpy/blob/main/LICENSE-MIT), at your
 option.

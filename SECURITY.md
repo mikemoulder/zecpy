@@ -14,7 +14,7 @@ ZecPy handles money and promises privacy. Both kinds of failure are security bug
 
 Please do **not** open a public issue. Use GitHub's private reporting instead:
 **Security** tab of this repository, then **Report a vulnerability**
-([direct link](https://github.com/xerodahdev/zecpy/security/advisories/new)).
+([direct link](https://github.com/mikemoulder/zecpy/security/advisories/new)).
 
 A useful report includes:
 
